@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quorum Notes</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="eyebrow">Local vault · 127.0.0.1 only</p>
+      <h1>Quorum Notes</h1>
+    </div>
+    <div class="top-actions">
+      <span id="ai-badge" class="badge">AI off</span>
+      <button type="button" id="btn-backup">Backup vault</button>
+      <button type="button" class="primary" id="btn-new">New meeting</button>
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <h2>Meetings</h2>
+      <ul id="meeting-list"></ul>
+      <p class="hint" id="vault-path"></p>
+    </aside>
+
+    <section id="editor" hidden>
+      <div class="row">
+        <label>Organization <input id="organization" placeholder="SAL Post 484 Squadron" /></label>
+        <label>Title <input id="title" placeholder="Regular Meeting" /></label>
+        <label>Date <input id="date" type="date" /></label>
+      </div>
+      <div class="row">
+        <label>Location <input id="location" placeholder="Post home" /></label>
+        <label>Called to order by <input id="called_to_order_by" /></label>
+        <label>Submitted by <input id="submitted_by" /></label>
+        <label>Office <input id="submitted_office" value="Adjutant" /></label>
+      </div>
+
+      <div class="panel record">
+        <div>
+          <h3>WAV recording</h3>
+          <p class="hint">Captured in the browser as WAV and stored only in the local vault.</p>
+        </div>
+        <div class="record-actions">
+          <button type="button" id="btn-rec">Record</button>
+          <button type="button" id="btn-stop" disabled>Stop &amp; save</button>
+          <span id="rec-status">No recording</span>
+        </div>
+        <audio id="player" controls hidden></audio>
+      </div>
+
+      <details open>
+        <summary>Roll call / Quorum</summary>
+        <div class="row">
+          <label>Roster (one name per line)
+            <textarea id="roster" rows="6" placeholder="Jeff Shumaker&#10;Mike Featherstone"></textarea>
+          </label>
+          <label>Present (one name per line)
+            <textarea id="present" rows="6"></textarea>
+          </label>
+        </div>
+        <div class="row">
+          <label>Quorum rule
+            <select id="quorum_rule">
+              <option value="majority">Majority of roster</option>
+              <option value="fixed">Fixed number</option>
+            </select>
+          </label>
+          <label>Fixed required <input id="quorum_fixed" type="number" min="0" value="0" /></label>
+          <p id="quorum-out" class="quorum-out"></p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Opening, reports, business</summary>
+        <label>Opening ceremonies (one per line)
+          <textarea id="opening" rows="3" placeholder="Chaplain offered the opening prayer."></textarea>
+        </label>
+        <div class="row">
+          <label>Previous minutes
+            <select id="previous_minutes">
+              <option value="pending">Pending</option>
+              <option value="approved">Approved as printed</option>
+              <option value="approved_as_corrected">Approved as corrected</option>
+              <option value="not_read">Not read</option>
+            </select>
+          </label>
+          <label>Minutes note <input id="previous_minutes_note" /></label>
+        </div>
+        <label>Reports (Title | Presenter | Body — one report per line)
+          <textarea id="reports" rows="4" placeholder="Finance | Ted Ruser | Checking ending balance $6,171.18"></textarea>
+        </label>
+        <label>Old business (one per line)
+          <textarea id="old_business" rows="3"></textarea>
+        </label>
+        <label>New business motions (Text | Mover | Seconder | Yeas | Nays | Result)
+          <textarea id="new_business" rows="4" placeholder="SAL cover VA veterans’ meals | William Wood | Herm Clear | 10 | 0 | carried"></textarea>
+        </label>
+        <label>Announcements (one per line)
+          <textarea id="announcements" rows="3"></textarea>
+        </label>
+        <label>Adjournment <input id="adjournment" /></label>
+        <label>Scratch notes
+          <textarea id="notes" rows="4"></textarea>
+        </label>
+      </details>
+
+      <div class="row actions">
+        <button type="button" class="primary" id="btn-save">Save to vault</button>
+        <button type="button" id="btn-sal">Load SAL template</button>
+        <button type="button" id="btn-transcribe">Opt-in: transcribe with SpaceXAI</button>
+        <button type="button" id="btn-draft">Opt-in: draft minutes with SpaceXAI</button>
+        <button type="button" class="danger" id="btn-delete">Delete</button>
+      </div>
+      <p class="hint" id="save-status"></p>
+
+      <article>
+        <h3>Formal minutes</h3>
+        <pre id="minutes"></pre>
+      </article>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
