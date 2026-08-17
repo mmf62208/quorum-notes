@@ -8,8 +8,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import ai, backup, config, settings as app_settings, vault
+from . import ai, backup, config, demo, settings as app_settings, vault
+from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
+
+
+def _meeting_payload(meeting: Meeting) -> dict:
+    return {
+        "meeting": meeting.to_dict(),
+        "markdown": render_minutes(meeting),
+        "agenda": agenda_status(meeting),
+    }
 
 
 def _json(handler: BaseHTTPRequestHandler, code: int, payload) -> None:
@@ -65,6 +74,7 @@ class Handler(BaseHTTPRequestHandler):
                         "vault": str(config.vault_dir()),
                         "ai": ai.ai_status(),
                         "settings": app_settings.load_settings(),
+                        "lan_urls": config.lan_urls(),
                     },
                 )
             if path == "/api/settings":
@@ -106,7 +116,7 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/meetings/") and "/api/meetings/" == path[:14] and path.count("/") == 3:
                 meeting_id = path.rsplit("/", 1)[-1]
                 meeting = vault.load_meeting(meeting_id)
-                return _json(self, 200, {"meeting": meeting.to_dict(), "markdown": render_minutes(meeting)})
+                return _json(self, 200, _meeting_payload(meeting))
             if path == "/api/backups":
                 return _json(self, 200, {"backups": backup.list_backups()})
             return self._static(path)
@@ -121,9 +131,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/settings":
                 return _json(self, 200, {"settings": app_settings.save_settings(_read_json(self))})
+            if path == "/api/demo":
+                meeting = demo.seed_post484_dry_run()
+                return _json(self, 201, _meeting_payload(meeting))
             if path == "/api/meetings":
                 meeting = vault.create_meeting(_read_json(self))
-                return _json(self, 201, {"meeting": meeting.to_dict(), "markdown": render_minutes(meeting)})
+                return _json(self, 201, _meeting_payload(meeting))
             if path.startswith("/api/meetings/") and path.endswith("/audio"):
                 meeting_id = path.split("/")[3]
                 data = _read_body(self)
@@ -169,7 +182,7 @@ class Handler(BaseHTTPRequestHandler):
                     m if isinstance(m, Motion) else Motion(**m) for m in meeting.new_business
                 ]
                 vault.save_meeting(meeting)
-                return _json(self, 200, {"meeting": meeting.to_dict(), "markdown": render_minutes(meeting)})
+                return _json(self, 200, _meeting_payload(meeting))
             _json(self, 404, {"error": "not found"})
         except FileNotFoundError:
             _json(self, 404, {"error": "not found"})

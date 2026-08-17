@@ -46,6 +46,7 @@
     </div>
     <div class="top-actions">
       <button type="button" id="btn-setup">Setup</button>
+      <button type="button" id="btn-demo">Dry-run</button>
       <button type="button" class="primary" id="btn-new">Start meeting</button>
     </div>
   </header>
@@ -88,7 +89,19 @@
       </div>
 
       <p id="quorum-out" class="quorum-out"></p>
+      <nav id="agenda" class="chips agenda"></nav>
+      <div class="row compact">
+        <button type="button" id="btn-prev-step">Back</button>
+        <strong id="step-label">Opening</strong>
+        <button type="button" class="primary" id="btn-next-step">Next</button>
+      </div>
 
+      <div id="step-opening" class="step-panel">
+        <h3>Opening</h3>
+        <p class="hint" id="opening-text"></p>
+      </div>
+
+      <div id="step-roll_call" class="step-panel" hidden>
       <h3>Who is here — tap to mark present, tap again while recording to tag the speaker</h3>
       <div id="people" class="chips"></div>
       <div class="row compact">
@@ -103,7 +116,39 @@
         </label>
       </div>
       <div id="photos" class="thumbs"></div>
+      </div>
 
+      <div id="step-previous_minutes" class="step-panel" hidden>
+        <h3>Previous minutes</h3>
+        <div class="row compact">
+          <button type="button" id="btn-prev-ok">Approve as printed</button>
+          <button type="button" id="btn-prev-fix">Approve as corrected</button>
+          <button type="button" id="btn-prev-skip">Dispense with reading</button>
+        </div>
+        <input id="previous_minutes_note" placeholder="Correction note (optional)" />
+      </div>
+
+      <div id="step-reports" class="step-panel" hidden>
+        <h3>Reports</h3>
+        <div class="row compact">
+          <input id="report-title" placeholder="Finance" />
+          <input id="report-presenter" placeholder="Ted Ruser" />
+        </div>
+        <textarea id="report-body" rows="2" placeholder="Checking ending balance…"></textarea>
+        <button type="button" id="btn-add-report">Add report</button>
+        <ul id="report-list"></ul>
+      </div>
+
+      <div id="step-old_business" class="step-panel" hidden>
+        <h3>Old business</h3>
+        <div class="row compact">
+          <input id="old-item" placeholder="Volunteer need remains open" />
+          <button type="button" id="btn-add-old">Add</button>
+        </div>
+        <ul id="old-list"></ul>
+      </div>
+
+      <div id="step-new_business" class="step-panel" hidden>
       <div id="rr-block">
         <h3>Motion</h3>
         <textarea id="motion-text" rows="2" placeholder="That SAL cover VA veterans’ meals…"></textarea>
@@ -127,6 +172,22 @@
         </span>
       </label>
       <ul id="takeaway-list"></ul>
+      </div>
+
+      <div id="step-announcements" class="step-panel" hidden>
+        <h3>Good of the order</h3>
+        <div class="row compact">
+          <input id="announce-item" placeholder="Next meeting in September" />
+          <button type="button" id="btn-add-announce">Add</button>
+        </div>
+        <ul id="announce-list"></ul>
+      </div>
+
+      <div id="step-adjournment" class="step-panel" hidden>
+        <h3>Adjourn</h3>
+        <input id="adjournment" placeholder="With no further business, the meeting was adjourned." />
+        <button type="button" id="btn-adjourn">Record adjournment</button>
+      </div>
 
       <details>
         <summary>Minutes header &amp; notes</summary>
@@ -136,7 +197,6 @@
         <label>Submitted by <input id="submitted_by" /></label>
         <label>Office <input id="submitted_office" /></label>
         <label>Scratch notes <textarea id="notes" rows="3"></textarea></label>
-        <label>Adjournment <input id="adjournment" /></label>
       </details>
 
       <div class="actions">

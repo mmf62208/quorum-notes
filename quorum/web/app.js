@@ -58,7 +58,11 @@ function fillHeader() {
   $("submitted_office").value = current.submitted_office || "";
   $("notes").value = current.notes || "";
   $("adjournment").value = current.adjournment || "";
+  $("previous_minutes_note").value = current.previous_minutes_note || "";
+  $("opening-text").textContent = (current.opening || []).join(" ");
   $("rr-block").hidden = current.roberts === false;
+  renderLists();
+  showStep(current.agenda_index || 0);
 }
 
 function readHeader() {
@@ -71,6 +75,49 @@ function readHeader() {
   current.submitted_office = $("submitted_office").value.trim();
   current.notes = $("notes").value;
   current.adjournment = $("adjournment").value.trim();
+  current.previous_minutes_note = $("previous_minutes_note").value.trim();
+}
+
+const STEP_IDS = [
+  "opening",
+  "roll_call",
+  "previous_minutes",
+  "reports",
+  "old_business",
+  "new_business",
+  "announcements",
+  "adjournment",
+];
+
+function showStep(index) {
+  if (!current) return;
+  current.agenda_index = Math.max(0, Math.min(STEP_IDS.length - 1, Number(index) || 0));
+  STEP_IDS.forEach((id, i) => {
+    const panel = $(`step-${id}`);
+    if (panel) panel.hidden = i !== current.agenda_index;
+  });
+  const nav = $("agenda");
+  nav.innerHTML = "";
+  STEP_IDS.forEach((id, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = id.replaceAll("_", " ");
+    if (i === current.agenda_index) b.classList.add("talking");
+    b.onclick = () => {
+      showStep(i);
+      saveMeeting().catch(() => {});
+    };
+    nav.appendChild(b);
+  });
+  $("step-label").textContent = STEP_IDS[current.agenda_index].replaceAll("_", " ");
+}
+
+function renderLists() {
+  $("report-list").innerHTML = (current.reports || [])
+    .map((r) => `<li><strong>${r.title}</strong> ${r.presenter || ""} — ${r.body || ""}</li>`)
+    .join("");
+  $("old-list").innerHTML = (current.old_business || []).map((t) => `<li>${t}</li>`).join("");
+  $("announce-list").innerHTML = (current.announcements || []).map((t) => `<li>${t}</li>`).join("");
 }
 
 function renderPeople() {
@@ -266,6 +313,8 @@ async function saveMeeting() {
   });
   current = data.meeting;
   $("minutes").textContent = data.markdown;
+  renderLists();
+  showStep(current.agenda_index || 0);
   $("save-status").textContent = `Saved ${new Date().toLocaleTimeString()}`;
   await refreshList();
 }
@@ -470,7 +519,8 @@ async function boot() {
   }
   const status = await api("/api/status");
   settings = status.settings || {};
-  $("vault-path").textContent = `${status.vault} · retention: ${settings.retention || "until_approved"}`;
+  const urls = (status.lan_urls || []).join(" · ");
+  $("vault-path").textContent = `${status.vault} · retention: ${settings.retention || "until_approved"}${urls ? " · phones: " + urls : ""}`;
   showWizard();
   await refreshList();
 }
@@ -494,6 +544,10 @@ $("btn-wiz-save").onclick = async () => {
 };
 
 $("btn-setup").onclick = () => showWizard(true);
+$("btn-demo").onclick = async () => {
+  const data = await api("/api/demo", { method: "POST" });
+  await openMeeting(data.meeting.id);
+};
 $("btn-new").onclick = async () => {
   const data = await api("/api/meetings", {
     method: "POST",
@@ -523,6 +577,64 @@ $("btn-speed").onclick = () => {
 $("btn-late").onclick = () => {
   pendingRole = "late";
   $("save-status").textContent = "Tap who arrived late.";
+};
+$("btn-prev-step").onclick = () => {
+  showStep((current.agenda_index || 0) - 1);
+  saveMeeting().catch(() => {});
+};
+$("btn-next-step").onclick = () => {
+  showStep((current.agenda_index || 0) + 1);
+  saveMeeting().catch(() => {});
+};
+$("btn-prev-ok").onclick = () => {
+  current.previous_minutes = "approved";
+  saveMeeting();
+};
+$("btn-prev-fix").onclick = () => {
+  current.previous_minutes = "approved_as_corrected";
+  current.previous_minutes_note = $("previous_minutes_note").value.trim();
+  saveMeeting();
+};
+$("btn-prev-skip").onclick = () => {
+  current.previous_minutes = "not_read";
+  saveMeeting();
+};
+$("btn-add-report").onclick = () => {
+  const title = $("report-title").value.trim();
+  if (!title) return;
+  current.reports = current.reports || [];
+  current.reports.push({
+    title,
+    presenter: $("report-presenter").value.trim(),
+    body: $("report-body").value.trim(),
+  });
+  $("report-title").value = "";
+  $("report-presenter").value = "";
+  $("report-body").value = "";
+  renderLists();
+};
+$("btn-add-old").onclick = () => {
+  const text = $("old-item").value.trim();
+  if (!text) return;
+  current.old_business = current.old_business || [];
+  current.old_business.push(text);
+  $("old-item").value = "";
+  renderLists();
+};
+$("btn-add-announce").onclick = () => {
+  const text = $("announce-item").value.trim();
+  if (!text) return;
+  current.announcements = current.announcements || [];
+  current.announcements.push(text);
+  $("announce-item").value = "";
+  renderLists();
+};
+$("btn-adjourn").onclick = () => {
+  if (!$("adjournment").value.trim()) {
+    $("adjournment").value = "With no further business, the meeting was adjourned.";
+  }
+  current.adjournment = $("adjournment").value.trim();
+  saveMeeting();
 };
 $("btn-add-person").onclick = () => {
   const name = $("new-person").value.trim();

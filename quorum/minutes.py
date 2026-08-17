@@ -102,6 +102,7 @@ class Meeting:
     file_stem: str = ""
     roberts: bool = True
     minutes_approved: bool = False
+    agenda_index: int = 0
     has_audio: bool = False
     has_transcript: bool = False
     created_at: str = ""

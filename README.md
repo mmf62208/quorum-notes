@@ -41,7 +41,11 @@ Add to Home Screen from the phone browser for a full-screen tester app.
 
 ## In a meeting
 
-1. **Start meeting** — auto-named file; SAL opening ceremonies are filled in.
+**Dry-run** seeds a Post 484 practice meeting so you can walk Opening → Roll call → Previous minutes → Reports → Motions → Adjourn → Email.
+
+The sidebar shows phone URLs when the laptop is on Wi‑Fi (use `QUORUM_HOST=0.0.0.0` so those URLs work).
+
+1. **Start meeting** or **Dry-run** — auto-named file; SAL opening ceremonies are filled in. Use **Next** to follow the order of business.
 2. **Hear the room** — pick the mic (headset / speakerphone / Bluetooth). The meter must move before Record.
 3. Tap names for **present**. **Mark late** then tap. While recording, tap a name to mark **who is talking**.
 4. Type a motion → **1st** → tap → **2nd** → tap → **Carried** / **Failed**. No second, no carry when Robert’s Rules is on.

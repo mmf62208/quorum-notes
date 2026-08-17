@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import vault_dir
+from .agenda import clamp_agenda_index
 from .minutes import Meeting, enforce_motion_rules, render_minutes
 from .naming import meeting_stem
 from .retention import should_delete_audio
@@ -151,6 +152,7 @@ def apply_retention(meeting: Meeting) -> bool:
 
 def save_meeting(meeting: Meeting) -> Meeting:
     enforce_motion_rules(meeting)
+    meeting.agenda_index = clamp_agenda_index(int(meeting.agenda_index or 0))
     folder = _meeting_dir(meeting.id)
     folder.mkdir(parents=True, exist_ok=True)
     apply_retention(meeting)
