@@ -1,6 +1,13 @@
 import unittest
 
-from quorum.minutes import Meeting, Motion, Report, render_minutes
+from quorum.minutes import (
+    Meeting,
+    Motion,
+    Report,
+    apply_motion_result,
+    enforce_motion_rules,
+    render_minutes,
+)
 
 
 class MinutesTests(unittest.TestCase):
@@ -25,6 +32,29 @@ class MinutesTests(unittest.TestCase):
         self.assertEqual(m.decide(), "failed")
         m.seconder = "Mike"
         self.assertEqual(m.decide(), "carried")
+
+    def test_rr_cannot_carry_without_second(self):
+        m = Motion(text="buy lumber", mover="Herm")
+        with self.assertRaises(ValueError) as ctx:
+            apply_motion_result(m, "carried", roberts=True)
+        self.assertIn("second", str(ctx.exception).lower())
+        self.assertEqual(m.result, "pending")
+        apply_motion_result(m, "carried", roberts=False)
+        self.assertEqual(m.result, "carried")
+        m2 = Motion(text="buy lumber", mover="Herm", seconder="Mike")
+        apply_motion_result(m2, "carried", roberts=True)
+        self.assertEqual(m2.result, "carried")
+
+    def test_enforce_motion_rules_blocks_carried_without_second(self):
+        meeting = Meeting(
+            id="rr1",
+            roberts=True,
+            new_business=[Motion(text="buy lumber", mover="Herm", result="carried")],
+        )
+        with self.assertRaises(ValueError):
+            enforce_motion_rules(meeting)
+        meeting.new_business[0].seconder = "Mike"
+        self.assertIs(enforce_motion_rules(meeting), meeting)
 
     def test_render_includes_quorum_and_motion(self):
         meeting = Meeting(

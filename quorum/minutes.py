@@ -26,6 +26,24 @@ class Motion:
         return self.result
 
 
+def apply_motion_result(motion: Motion, result: str, roberts: bool = True) -> Motion:
+    """Mark a motion result. With Robert’s Rules on, carried requires a second."""
+    if result == "carried" and roberts and not (motion.seconder or "").strip():
+        raise ValueError("Need a second before it can carry")
+    motion.result = result
+    return motion
+
+
+def enforce_motion_rules(meeting: Meeting) -> Meeting:
+    """Refuse to persist a carried motion that lacks a second when RR is on."""
+    if not meeting.roberts:
+        return meeting
+    for motion in meeting.new_business:
+        if motion.result == "carried" and not (motion.seconder or "").strip():
+            raise ValueError("Need a second before it can carry")
+    return meeting
+
+
 @dataclass
 class Report:
     title: str

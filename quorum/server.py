@@ -77,6 +77,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not audio.is_file():
                     return _json(self, 404, {"error": "no audio"})
                 return _bytes(self, 200, audio.read_bytes(), "audio/wav")
+            if path.startswith("/api/meetings/") and path.endswith("/minutes.md"):
+                meeting_id = path.split("/")[3]
+                meeting = vault.load_meeting(meeting_id)
+                mail = email_payload(meeting)
+                data = mail["body"].encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/markdown; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{mail["filename"]}"')
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if path.startswith("/api/meetings/") and path.endswith("/minutes"):
                 meeting_id = path.split("/")[3]
                 meeting = vault.load_meeting(meeting_id)

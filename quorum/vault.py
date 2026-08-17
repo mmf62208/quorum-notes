@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import vault_dir
-from .minutes import Meeting, render_minutes
+from .minutes import Meeting, enforce_motion_rules, render_minutes
 from .naming import meeting_stem
 from . import settings as app_settings
 
@@ -114,6 +114,7 @@ def load_meeting(meeting_id: str) -> Meeting:
 
 
 def save_meeting(meeting: Meeting) -> Meeting:
+    enforce_motion_rules(meeting)
     folder = _meeting_dir(meeting.id)
     folder.mkdir(parents=True, exist_ok=True)
     meeting.updated_at = _now()

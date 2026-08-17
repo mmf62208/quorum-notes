@@ -219,6 +219,8 @@ async function openMeeting(id) {
   updateQuorum();
   $("minutes").textContent = data.markdown;
   $("player").src = current.has_audio ? `/api/meetings/${id}/audio?t=${Date.now()}` : "";
+  $("btn-download").href = `/api/meetings/${id}/minutes.md`;
+  $("btn-download").setAttribute("download", `${current.file_stem || id}-minutes.md`);
   await refreshList();
 }
 
