@@ -632,7 +632,12 @@ $("btn-new").onclick = async () => {
   await openMeeting(data.meeting.id);
 };
 $("btn-save").onclick = () => saveMeeting().catch((e) => { $("save-status").textContent = e.message; });
-$("btn-rec").onclick = () => startRec().catch((e) => { $("meter-label").textContent = e.message; });
+$("btn-rec").onclick = () => startRec().catch((e) => {
+  const msg = String(e.message || e);
+  $("meter-label").textContent = /notallowed|permission|denied/i.test(msg)
+    ? "Microphone blocked — allow access in the browser, or pick another device"
+    : msg;
+});
 $("btn-stop").onclick = () => stopRec().catch((e) => { $("meter-label").textContent = e.message; });
 $("btn-arm-mic").onclick = () => armMic().catch((e) => { $("meter-label").textContent = e.message; });
 $("mic-device").onchange = () => armMic().catch((e) => { $("meter-label").textContent = e.message; });

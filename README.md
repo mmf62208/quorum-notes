@@ -70,3 +70,7 @@ Nothing is uploaded unless you tap **Polish with SpaceXAI** and `XAI_API_KEY` is
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+That suite includes a **bot** (`tests/test_http_bot.py`) that starts the real server and walks a full meeting: setup, create, reject a carried motion with no second, save a legal motion, sign-in merge, audio, email, download, print, approve (tape gone), dry-run, backup.
+
+Officer one-pager: [`docs/OFFICER.md`](docs/OFFICER.md).

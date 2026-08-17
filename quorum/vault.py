@@ -144,9 +144,9 @@ def apply_retention(meeting: Meeting) -> bool:
         minutes_approved=bool(meeting.minutes_approved),
         recorded_at=recorded_at,
     ):
-        delete_audio_files(meeting.id)
+        removed = delete_audio_files(meeting.id)
         meeting.has_audio = False
-        return True
+        return removed > 0
     return False
 
 
