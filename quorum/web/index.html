@@ -46,6 +46,10 @@
     </div>
     <div class="top-actions">
       <button type="button" id="btn-setup">Setup</button>
+      <button type="button" id="btn-backup">Backup</button>
+      <label class="file-btn">Restore
+        <input type="file" id="restore-file" accept=".zip,application/zip" hidden />
+      </label>
       <button type="button" id="btn-demo">Dry-run</button>
       <button type="button" class="primary" id="btn-new">Start meeting</button>
     </div>
@@ -71,6 +75,9 @@
       <div class="row compact">
         <label>Microphone
           <select id="mic-device"></select>
+        </label>
+        <label>Playback
+          <select id="spk-device"></select>
         </label>
         <button type="button" id="btn-arm-mic">Hear the room</button>
       </div>
@@ -116,6 +123,11 @@
         </label>
       </div>
       <div id="photos" class="thumbs"></div>
+      <div id="signin-review" hidden>
+        <h3>Sign-in sheet — tick who you see, then apply</h3>
+        <div id="signin-names" class="chips"></div>
+        <button type="button" id="btn-apply-signin">Apply sign-in to present</button>
+      </div>
       </div>
 
       <div id="step-previous_minutes" class="step-panel" hidden>
@@ -201,6 +213,7 @@
 
       <div class="actions">
         <button type="button" class="primary" id="btn-save">Save</button>
+        <button type="button" id="btn-undo">Undo</button>
         <button type="button" id="btn-email">Email minutes</button>
         <a id="btn-download" class="file-btn" href="#" download>Download minutes</a>
         <button type="button" id="btn-share">Share</button>

@@ -24,6 +24,31 @@ def make_backup() -> Path:
     return dest
 
 
+def restore_backup(zip_path: Path) -> int:
+    """Replace vault files from a local zip. Rejects paths that escape the vault."""
+    src = Path(zip_path)
+    if not src.is_file():
+        raise FileNotFoundError(str(src))
+    dest = vault_dir()
+    dest.mkdir(parents=True, exist_ok=True)
+    root = dest.resolve()
+    count = 0
+    with ZipFile(src) as zf:
+        for info in zf.infolist():
+            name = info.filename.replace("\\", "/")
+            if info.is_dir() or name.startswith("/") or ".." in Path(name).parts:
+                continue
+            target = (dest / name).resolve()
+            if target != root and root not in target.parents:
+                continue
+            if target == root:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(zf.read(info))
+            count += 1
+    return count
+
+
 def list_backups() -> list[dict[str, str | int]]:
     dest_dir = backups_dir()
     if not dest_dir.exists():

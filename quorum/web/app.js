@@ -5,6 +5,7 @@ let current = null;
 let rec = { ctx: null, proc: null, stream: null, chunks: [], started: 0, analyser: null, raf: 0 };
 let pendingRole = null;
 let playbackRate = 1;
+let undoStack = [];
 
 function lines(text) {
   return String(text || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
@@ -62,6 +63,7 @@ function fillHeader() {
   $("opening-text").textContent = (current.opening || []).join(" ");
   $("rr-block").hidden = current.roberts === false;
   renderLists();
+  renderSigninReview();
   showStep(current.agenda_index || 0);
 }
 
@@ -157,7 +159,29 @@ function renderMarks() {
   });
 }
 
+function snapshot() {
+  if (!current) return;
+  undoStack.push(JSON.stringify(current));
+  if (undoStack.length > 30) undoStack.shift();
+}
+
+async function undoLast() {
+  const raw = undoStack.pop();
+  if (!raw || !current) {
+    $("save-status").textContent = "Nothing to undo";
+    return;
+  }
+  current = JSON.parse(raw);
+  fillHeader();
+  renderPeople();
+  renderMotions();
+  renderTakeaways();
+  await saveMeeting();
+  $("save-status").textContent = "Undid last change";
+}
+
 function onPerson(name) {
+  snapshot();
   if (rec.started) {
     const seconds = (Date.now() - rec.started) / 1000;
     current.speaker_marks = current.speaker_marks || [];
@@ -293,6 +317,7 @@ async function openMeeting(id) {
   renderMotions();
   renderTakeaways();
   renderPhotos();
+  renderSigninReview();
   updateQuorum();
   $("minutes").textContent = data.markdown;
   $("player").src = current.has_audio ? `/api/meetings/${id}/audio?t=${Date.now()}` : "";
@@ -410,6 +435,34 @@ async function fillMics() {
     sel.appendChild(opt);
   });
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  const outs = devices.filter((d) => d.kind === "audiooutput");
+  const spk = $("spk-device");
+  if (spk) {
+    const prevOut = spk.value;
+    spk.innerHTML = "";
+    if (!outs.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "Default speakers";
+      spk.appendChild(opt);
+    }
+    outs.forEach((d, i) => {
+      const opt = document.createElement("option");
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Speaker ${i + 1}`;
+      spk.appendChild(opt);
+    });
+    if (prevOut && [...spk.options].some((o) => o.value === prevOut)) spk.value = prevOut;
+    applySink();
+  }
+}
+
+function applySink() {
+  const player = $("player");
+  const id = $("spk-device")?.value;
+  if (player && id && typeof player.setSinkId === "function") {
+    player.setSinkId(id).catch(() => {});
+  }
 }
 
 async function openMic(recordChunks) {
@@ -484,12 +537,34 @@ function fileToDataUrl(file) {
   });
 }
 
+function renderSigninReview() {
+  const box = $("signin-review");
+  const names = $("signin-names");
+  if (!box || !names || !current) return;
+  const hasSheet = (current.photos || []).some((p) => p.kind === "sign_in");
+  box.hidden = !hasSheet;
+  names.innerHTML = "";
+  (current.roster || []).forEach((name) => {
+    const label = document.createElement("label");
+    label.className = "check";
+    const boxEl = document.createElement("input");
+    boxEl.type = "checkbox";
+    boxEl.value = name;
+    boxEl.checked = (current.present || []).includes(name);
+    label.appendChild(boxEl);
+    label.appendChild(document.createTextNode(" " + name));
+    names.appendChild(label);
+  });
+}
+
 async function addPhoto(file, kind) {
   if (!file || !current) return;
+  snapshot();
   const data_url = await fileToDataUrl(file);
   current.photos = current.photos || [];
   current.photos.push({ name: file.name || kind, kind, data_url });
   renderPhotos();
+  renderSigninReview();
   await saveMeeting();
 }
 
@@ -647,6 +722,7 @@ $("btn-add-person").onclick = () => {
   renderPeople();
 };
 $("btn-1st").onclick = () => {
+  snapshot();
   pendingRole = "1st";
   $("motion-status").textContent = "Tap who firsted the motion.";
 };
@@ -669,6 +745,7 @@ $("btn-nay").onclick = () => {
   }
 };
 $("btn-carry").onclick = () => {
+  snapshot();
   const m = currentMotion();
   if (!m) return;
   if (current.roberts !== false && !m.seconder) {
@@ -680,6 +757,7 @@ $("btn-carry").onclick = () => {
   renderMotions();
 };
 $("btn-fail").onclick = () => {
+  snapshot();
   const m = currentMotion();
   if (!m) return;
   m.result = "failed";
@@ -726,6 +804,48 @@ $("btn-draft").onclick = async () => {
     $("save-status").textContent = e.message;
   }
 };
+$("btn-undo").onclick = () => undoLast().catch((e) => { $("save-status").textContent = e.message; });
+$("btn-backup").onclick = async () => {
+  const data = await api("/api/backup", { method: "POST" });
+  $("save-status").textContent = `Backup ${data.name}`;
+  window.location.href = `/api/backups/${encodeURIComponent(data.name)}`;
+};
+$("restore-file").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  const res = await fetch("/api/restore", { method: "POST", body: buf });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  $("save-status").textContent = `Restored ${data.files} files`;
+  await refreshList();
+};
+$("btn-apply-signin").onclick = async () => {
+  snapshot();
+  const names = [...$("signin-names").querySelectorAll("input:checked")].map((el) => el.value);
+  const data = await api(`/api/meetings/${current.id}/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names }),
+  });
+  current = data.meeting;
+  fillHeader();
+  renderPeople();
+  $("minutes").textContent = data.markdown;
+  $("save-status").textContent = `Sign-in applied (${(data.signin && data.signin.matched.length) || names.length})`;
+};
+$("spk-device").onchange = () => applySink();
+document.addEventListener("keydown", (event) => {
+  if (event.target.matches("input, textarea, select")) return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    undoLast();
+    return;
+  }
+  if (event.key === "1") $("btn-1st").click();
+  if (event.key === "2") $("btn-2nd").click();
+  if (event.key.toLowerCase() === "v") $("btn-carry").click();
+});
 $("btn-delete").onclick = async () => {
   if (!current || !confirm("Delete this meeting from this device?")) return;
   await api(`/api/meetings/${current.id}`, { method: "DELETE" });

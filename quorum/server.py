@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import ai, backup, config, demo, settings as app_settings, vault
+from . import ai, backup, config, demo, settings as app_settings, signin, vault
 from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
 
@@ -117,6 +117,19 @@ class Handler(BaseHTTPRequestHandler):
                 meeting_id = path.rsplit("/", 1)[-1]
                 meeting = vault.load_meeting(meeting_id)
                 return _json(self, 200, _meeting_payload(meeting))
+            if path.startswith("/api/backups/") and path.count("/") == 3:
+                name = path.rsplit("/", 1)[-1]
+                dest = next((b for b in backup.list_backups() if b["name"] == name), None)
+                if not dest:
+                    return _json(self, 404, {"error": "not found"})
+                data = Path(str(dest["path"])).read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if path == "/api/backups":
                 return _json(self, 200, {"backups": backup.list_backups()})
             return self._static(path)
@@ -157,9 +170,32 @@ class Handler(BaseHTTPRequestHandler):
                 meeting = vault.load_meeting(meeting_id)
                 text = ai.draft_minutes(meeting, vault.read_transcript(meeting_id))
                 return _json(self, 200, {"markdown": text})
+            if path.startswith("/api/meetings/") and path.endswith("/signin"):
+                meeting_id = path.split("/")[3]
+                meeting = vault.load_meeting(meeting_id)
+                names = _read_json(self).get("names") or []
+                result = signin.merge_present(meeting.roster, meeting.present, list(names))
+                meeting.present = result["present"]
+                vault.save_meeting(meeting)
+                payload = _meeting_payload(meeting)
+                payload["signin"] = result
+                return _json(self, 200, payload)
             if path == "/api/backup":
                 dest = backup.make_backup()
                 return _json(self, 201, {"ok": True, "path": str(dest), "name": dest.name})
+            if path == "/api/restore":
+                data = _read_body(self)
+                if not data:
+                    return _json(self, 400, {"error": "empty backup"})
+                tmp = config.backups_dir() / "_restore-upload.zip"
+                config.backups_dir().mkdir(parents=True, exist_ok=True)
+                tmp.write_bytes(data)
+                try:
+                    count = backup.restore_backup(tmp)
+                finally:
+                    if tmp.exists():
+                        tmp.unlink()
+                return _json(self, 200, {"ok": True, "files": count})
             _json(self, 404, {"error": "not found"})
         except FileNotFoundError:
             _json(self, 404, {"error": "not found"})

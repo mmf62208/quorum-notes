@@ -51,7 +51,9 @@ The sidebar shows phone URLs when the laptop is on Wi‑Fi (use `QUORUM_HOST=0.0
 4. Type a motion → **1st** → tap → **2nd** → tap → **Carried** / **Failed**. No second, no carry when Robert’s Rules is on.
 5. Take a **sign-in** or document photo.
 6. **Stop** → listen back (−15 / +15 / speed, or tap a speaker mark) → **Email**, **Download**, or **Print / PDF**.
-7. **Mark minutes approved** — if retention is “until approved,” the WAV is deleted; the minutes stay.
+7. After a **sign-in photo**, tick the names you see and **Apply sign-in to present**. Unknown names are not added as members.
+8. **Undo** or `Ctrl+Z`. Keys: `1` first, `2` second, `V` carried.
+9. **Backup** / **Restore** zip the whole vault. **Mark minutes approved** deletes the WAV if you chose “until approved.”
 
 ## What stays on the device
 
