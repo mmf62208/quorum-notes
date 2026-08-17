@@ -34,6 +34,25 @@ class Report:
 
 
 @dataclass
+class SpeakerMark:
+    seconds: float
+    name: str
+
+
+@dataclass
+class Takeaway:
+    text: str
+    owner: str = ""
+
+
+@dataclass
+class Photo:
+    name: str
+    kind: str = "document"  # document | sign_in
+    data_url: str = ""
+
+
+@dataclass
 class Meeting:
     id: str
     title: str = "Regular Meeting"
@@ -57,6 +76,14 @@ class Meeting:
     submitted_office: str = "Adjutant"
     closing: str = ""
     notes: str = ""
+    late: list[str] = field(default_factory=list)
+    guests: list[str] = field(default_factory=list)
+    speaker_marks: list[SpeakerMark] = field(default_factory=list)
+    takeaways: list[Takeaway] = field(default_factory=list)
+    photos: list[Photo] = field(default_factory=list)
+    file_stem: str = ""
+    roberts: bool = True
+    minutes_approved: bool = False
     has_audio: bool = False
     has_transcript: bool = False
     created_at: str = ""
@@ -76,11 +103,16 @@ class Meeting:
 
     def roll_call(self) -> dict[str, Any]:
         present = [n for n in self.present if n]
-        absent = [n for n in self.roster if n and n not in present]
+        late = [n for n in self.late if n]
+        guests = [n for n in self.guests if n]
+        marked = set(present) | set(late)
+        absent = [n for n in self.roster if n and n not in marked]
         extra = [n for n in present if n not in self.roster]
         return {
             "roster_count": len(self.roster),
             "present_count": len(present),
+            "late": late,
+            "guests": guests,
             "absent_count": len(absent),
             "guests_or_unlisted": extra,
             "absent": absent,
@@ -100,6 +132,13 @@ class Meeting:
         payload["new_business"] = [
             Motion(**m) if isinstance(m, dict) else m for m in payload.get("new_business", [])
         ]
+        payload["speaker_marks"] = [
+            SpeakerMark(**s) if isinstance(s, dict) else s for s in payload.get("speaker_marks", [])
+        ]
+        payload["takeaways"] = [
+            Takeaway(**t) if isinstance(t, dict) else t for t in payload.get("takeaways", [])
+        ]
+        payload["photos"] = [Photo(**p) if isinstance(p, dict) else p for p in payload.get("photos", [])]
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         return cls(**{k: v for k, v in payload.items() if k in known})
 
@@ -131,6 +170,12 @@ def render_minutes(meeting: Meeting) -> str:
         lines.append("Members present included:")
         lines.append("")
         lines.append(", ".join(meeting.present) + ".")
+        lines.append("")
+    if meeting.late:
+        lines.append("Arrived late: " + ", ".join(meeting.late) + ".")
+        lines.append("")
+    if meeting.guests:
+        lines.append("Guests: " + ", ".join(meeting.guests) + ".")
         lines.append("")
     if rc["quorum"]:
         lines.append(
@@ -196,6 +241,21 @@ def render_minutes(meeting: Meeting) -> str:
     if meeting.closing:
         lines.append(meeting.closing)
         lines.append("")
+    if meeting.takeaways:
+        lines.append("**Takeaways / assignments:**")
+        lines.append("")
+        for item in meeting.takeaways:
+            who = f" — {item.owner}" if item.owner else ""
+            lines.append(f"* {item.text}{who}")
+        lines.append("")
+    if meeting.speaker_marks:
+        lines.append("**Speaker marks (for review):**")
+        lines.append("")
+        for mark in meeting.speaker_marks:
+            mins = int(mark.seconds) // 60
+            secs = int(mark.seconds) % 60
+            lines.append(f"* {mins:02d}:{secs:02d} — {mark.name}")
+        lines.append("")
     if meeting.submitted_by:
         lines.append("**Respectfully submitted,**")
         lines.append("")
@@ -204,3 +264,11 @@ def render_minutes(meeting: Meeting) -> str:
             lines.append(f"**{meeting.submitted_office}**")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def email_payload(meeting: Meeting) -> dict[str, str]:
+    body = render_minutes(meeting)
+    org = meeting.organization or "Meeting"
+    date = meeting.date or ""
+    subject = f"{org} minutes {date}".strip()
+    return {"subject": subject, "body": body, "filename": f"{meeting.file_stem or meeting.id}-minutes.md"}

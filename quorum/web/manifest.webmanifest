@@ -1,0 +1,9 @@
+{
+  "name": "Quorum Notes",
+  "short_name": "Quorum",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14110e",
+  "theme_color": "#8b1e1e",
+  "description": "Privacy-first meeting notes for civic officers."
+}

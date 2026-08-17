@@ -11,8 +11,10 @@ from typing import Any
 
 from .config import vault_dir
 from .minutes import Meeting, render_minutes
+from .naming import meeting_stem
+from . import settings as app_settings
 
-SAFE_ID = re.compile(r"^[a-zA-Z0-9_-]{6,64}$")
+SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{4,120}$")
 
 
 def _now() -> str:
@@ -48,7 +50,8 @@ def list_meetings() -> list[dict[str, Any]]:
                 "organization": data.get("organization", ""),
                 "date": data.get("date", ""),
                 "updated_at": data.get("updated_at", ""),
-                "has_audio": (path / "audio.wav").is_file(),
+                "file_stem": data.get("file_stem", path.name),
+                "has_audio": (path / "audio.wav").is_file() or any(path.glob("*.wav")),
                 "has_transcript": (path / "transcript.txt").is_file(),
                 "quorum": Meeting.from_dict(data).quorum_present(),
             }
@@ -57,13 +60,39 @@ def list_meetings() -> list[dict[str, Any]]:
     return items
 
 
+def _unique_stem(stem: str) -> str:
+    root = ensure_vault() / "meetings"
+    if not (root / stem).exists():
+        return stem
+    for i in range(2, 50):
+        candidate = f"{stem}_{i}"
+        if not (root / candidate).exists():
+            return candidate
+    return f"{stem}_{uuid.uuid4().hex[:4]}"
+
+
 def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
     fields = dict(fields or {})
-    meeting_id = fields.pop("id", None) or uuid.uuid4().hex[:12]
+    prefs = app_settings.load_settings()
+    fields.setdefault("organization", prefs.get("organization", ""))
+    fields.setdefault("submitted_by", prefs.get("submitted_by", ""))
+    fields.setdefault("submitted_office", prefs.get("submitted_office", ""))
+    fields.setdefault("location", prefs.get("default_location", ""))
+    fields.setdefault("called_to_order_by", prefs.get("called_to_order_by", ""))
+    fields.setdefault("roster", list(prefs.get("roster") or []))
+    fields.setdefault("roberts", bool(prefs.get("roberts", True)))
+    fields.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
+    stem = fields.get("file_stem") or meeting_stem(
+        fields.get("organization", ""),
+        fields.get("title", "Regular Meeting"),
+    )
+    stem = _unique_stem(stem)
+    meeting_id = fields.pop("id", None) or stem
     now = _now()
     meeting = Meeting.from_dict(
         {
             "id": meeting_id,
+            "file_stem": stem,
             "created_at": now,
             "updated_at": now,
             **fields,
@@ -78,8 +107,9 @@ def load_meeting(meeting_id: str) -> Meeting:
     if not path.is_file():
         raise FileNotFoundError(meeting_id)
     meeting = Meeting.from_dict(json.loads(path.read_text(encoding="utf-8")))
-    meeting.has_audio = (_meeting_dir(meeting_id) / "audio.wav").is_file()
-    meeting.has_transcript = (_meeting_dir(meeting_id) / "transcript.txt").is_file()
+    folder = _meeting_dir(meeting_id)
+    meeting.has_audio = (folder / "audio.wav").is_file() or any(folder.glob("*.wav"))
+    meeting.has_transcript = (folder / "transcript.txt").is_file()
     return meeting
 
 
@@ -87,7 +117,7 @@ def save_meeting(meeting: Meeting) -> Meeting:
     folder = _meeting_dir(meeting.id)
     folder.mkdir(parents=True, exist_ok=True)
     meeting.updated_at = _now()
-    meeting.has_audio = (folder / "audio.wav").is_file()
+    meeting.has_audio = (folder / "audio.wav").is_file() or any(folder.glob("*.wav"))
     meeting.has_transcript = (folder / "transcript.txt").is_file()
     (folder / "meeting.json").write_text(
         json.dumps(meeting.to_dict(), indent=2, ensure_ascii=False) + "\n",
@@ -102,15 +132,23 @@ def save_meeting(meeting: Meeting) -> Meeting:
 def save_audio(meeting_id: str, data: bytes) -> Path:
     folder = _meeting_dir(meeting_id)
     folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / "audio.wav"
-    dest.write_bytes(data)
     meeting = load_meeting(meeting_id)
-    save_meeting(meeting)
+    dest = folder / f"{meeting.file_stem or meeting_id}.wav"
+    dest.write_bytes(data)
+    save_meeting(load_meeting(meeting_id))
     return dest
 
 
 def audio_path(meeting_id: str) -> Path:
-    return _meeting_dir(meeting_id) / "audio.wav"
+    folder = _meeting_dir(meeting_id)
+    named = folder / f"{load_meeting(meeting_id).file_stem or meeting_id}.wav"
+    if named.is_file():
+        return named
+    legacy = folder / "audio.wav"
+    if legacy.is_file():
+        return legacy
+    found = sorted(folder.glob("*.wav"))
+    return found[0] if found else named
 
 
 def save_transcript(meeting_id: str, text: str) -> Path:

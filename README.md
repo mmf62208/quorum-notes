@@ -1,61 +1,65 @@
-# Quorum Notes
+# Quorum
 
-Privacy-first meeting capture for civic and lodge work: **WAV recording**, a **local vault**, **zip backups**, and **formal minutes helpers**. Advanced AI is **opt-in only** (SpaceXAI / `XAI_API_KEY`). MIT licensed.
+Privacy-first meeting assistant for civic officers: record the room, mark who is present and who spoke, track 1st / 2nd / vote, email the minutes. Advanced AI is **opt-in only** (SpaceXAI). MIT.
 
-This tree is a **rebuild** on a new CachyOS machine. The GitHub repo `mmf62208/quorum-notes` was created 2026-08-13 with the description above but **no commits**. Prior source and chat transcripts were not on this host, not in Gmail/Drive (except SAL minutes), and not in local Claude/Cursor/Codex sessions. The product spec comes from that GitHub description plus the formal minutes style of [SAL Post 484, 16 June 2026](https://docs.google.com/document/d/1l5QnMjW1LGRNE_-V61uoy1NJAp-xIVNjw5l6PrU-Edo/edit) (adjutant: Mike Featherstone).
+Built for in-person lodge/post meetings first (phone in your hand), with desktop and Zoom still supported.
 
-## Run
+## Run on this computer
 
 ```bash
 cd ~/Projects/quorum-notes
 python3 -m quorum
 ```
 
-Then open [http://127.0.0.1:4840](http://127.0.0.1:4840). The server binds **localhost only**.
+Open [http://127.0.0.1:4840](http://127.0.0.1:4840). First launch asks org, retention, and roster.
+
+### Give it to another desktop tester
+
+```bash
+tools/pack_tester.sh
+```
+
+Send `dist/quorum-tester.zip`. They need Python 3.11+:
+
+```bash
+unzip quorum-tester.zip
+cd quorum-notes   # or whatever folder unzip created
+python3 -m quorum
+```
+
+### Phones at the hall (same Wi‑Fi)
+
+On the laptop that is recording the official vault:
+
+```bash
+QUORUM_HOST=0.0.0.0 python3 -m quorum
+```
+
+Phones on that network open `http://<laptop-lan-ip>:4840`. Data stays on the laptop. Do not expose that port to the public internet.
+
+Add to Home Screen from the phone browser for a full-screen tester app.
+
+## In a meeting
+
+1. **Start meeting** — file is named for you (`2026-09-15_SAL-Post-484-Squadron_Regular-Meeting_1900`).
+2. Watch the **meter**. It must bounce before you trust the tape (“Hearing the room” vs “Too quiet”).
+3. Tap names for **present**. While recording, tap a name to mark **who is talking**.
+4. Type a motion → **1st** → tap the member → **2nd** → tap → **Carried** / **Failed**. A motion cannot carry without a second when Robert’s Rules is on.
+5. Take a **sign-in** or document photo.
+6. **Stop** → **Email minutes** (opens the phone/desktop mail app) or **Share**.
+
+## What stays on the device
+
+| Path | Contents |
+|------|----------|
+| `vault/settings.json` | First-run org, roster, retention |
+| `vault/meetings/<auto-name>/` | JSON, named WAV, minutes.md, photos in JSON |
+| `backups/` | Zip of the vault |
+
+Retention (you pick at setup): until minutes approved · 7 days · 14 days · keep until delete.
+
+Nothing is uploaded unless you tap **Polish with SpaceXAI** and `XAI_API_KEY` is set.
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
-
-## What it stores
-
-| Path | Contents |
-|------|----------|
-| `vault/meetings/<id>/meeting.json` | Structured meeting (roll call, motions, reports) |
-| `vault/meetings/<id>/audio.wav` | Browser-captured WAV |
-| `vault/meetings/<id>/minutes.md` | Formal minutes render |
-| `vault/meetings/<id>/transcript.txt` | Only if you opt into SpaceXAI STT |
-| `backups/quorum-vault-*.zip` | Local zip of the vault |
-
-Nothing is uploaded unless you click **Opt-in: transcribe** or **Opt-in: draft minutes** and `XAI_API_KEY` is set.
-
-## Formal minutes helpers
-
-- Roll call + **quorum** (majority of roster, or a fixed number)
-- Motions: mover, seconder, yeas/nays, carried/failed
-- SAL-style Markdown: called to order, opening, quorum, previous minutes, reports, old/new business, adjournment, respectfully submitted
-- **Load SAL template** fills Post 484 officer/opening scaffolding
-
-## Optional SpaceXAI
-
-```bash
-export XAI_API_KEY=...          # https://console.x.ai
-export XAI_MODEL=grok-4.6       # optional
-python3 -m quorum
-```
-
-- Transcribe uses `POST https://api.x.ai/v1/stt`
-- Draft minutes uses `POST https://api.x.ai/v1/responses`
-- The API key stays on the server process. The browser never sees it.
-
-## Environment
-
-| Variable | Default |
-|----------|---------|
-| `QUORUM_HOST` | `127.0.0.1` |
-| `QUORUM_PORT` | `4840` |
-| `QUORUM_VAULT` | `./vault` |
-| `QUORUM_BACKUPS` | `./backups` |
-| `XAI_API_KEY` | unset (AI off) |
-
-No third-party Python packages are required for recording, vault, minutes, or backup.
