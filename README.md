@@ -41,12 +41,13 @@ Add to Home Screen from the phone browser for a full-screen tester app.
 
 ## In a meeting
 
-1. **Start meeting** — file is named for you (`2026-09-15_SAL-Post-484-Squadron_Regular-Meeting_1900`).
-2. Watch the **meter**. It must bounce before you trust the tape (“Hearing the room” vs “Too quiet”).
-3. Tap names for **present**. While recording, tap a name to mark **who is talking**.
-4. Type a motion → **1st** → tap the member → **2nd** → tap → **Carried** / **Failed**. A motion cannot carry without a second when Robert’s Rules is on.
+1. **Start meeting** — auto-named file; SAL opening ceremonies are filled in.
+2. **Hear the room** — pick the mic (headset / speakerphone / Bluetooth). The meter must move before Record.
+3. Tap names for **present**. **Mark late** then tap. While recording, tap a name to mark **who is talking**.
+4. Type a motion → **1st** → tap → **2nd** → tap → **Carried** / **Failed**. No second, no carry when Robert’s Rules is on.
 5. Take a **sign-in** or document photo.
-6. **Stop** → **Email minutes** (opens the phone/desktop mail app) or **Share**.
+6. **Stop** → listen back (−15 / +15 / speed, or tap a speaker mark) → **Email**, **Download**, or **Print / PDF**.
+7. **Mark minutes approved** — if retention is “until approved,” the WAV is deleted; the minutes stay.
 
 ## What stays on the device
 
