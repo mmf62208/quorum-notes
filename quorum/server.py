@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import ai, backup, config, settings as app_settings, vault
-from .minutes import Meeting, Motion, Report, email_payload, render_minutes
+from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
 
 
 def _json(handler: BaseHTTPRequestHandler, code: int, payload) -> None:
@@ -77,6 +77,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not audio.is_file():
                     return _json(self, 404, {"error": "no audio"})
                 return _bytes(self, 200, audio.read_bytes(), "audio/wav")
+            if path.startswith("/api/meetings/") and path.endswith("/print.html"):
+                meeting_id = path.split("/")[3]
+                meeting = vault.load_meeting(meeting_id)
+                html = render_minutes_html(meeting).encode("utf-8")
+                return _bytes(self, 200, html, "text/html; charset=utf-8")
             if path.startswith("/api/meetings/") and path.endswith("/minutes.md"):
                 meeting_id = path.split("/")[3]
                 meeting = vault.load_meeting(meeting_id)

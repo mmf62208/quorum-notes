@@ -5,8 +5,10 @@ from quorum.minutes import (
     Motion,
     Report,
     apply_motion_result,
+    email_payload,
     enforce_motion_rules,
     render_minutes,
+    render_minutes_html,
 )
 
 
@@ -87,6 +89,11 @@ class MinutesTests(unittest.TestCase):
         self.assertIn("William Wood moved", text)
         self.assertIn("Respectfully submitted", text)
         self.assertIn("SAL Post 484", text)
+        html = render_minutes_html(meeting)
+        self.assertIn("<!DOCTYPE html>", html)
+        self.assertIn("William Wood moved", html)
+        mail = email_payload(meeting)
+        self.assertEqual(mail["body"], text)
 
 
 if __name__ == "__main__":

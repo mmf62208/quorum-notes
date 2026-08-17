@@ -290,3 +290,21 @@ def email_payload(meeting: Meeting) -> dict[str, str]:
     date = meeting.date or ""
     subject = f"{org} minutes {date}".strip()
     return {"subject": subject, "body": body, "filename": f"{meeting.file_stem or meeting.id}-minutes.md"}
+
+
+def render_minutes_html(meeting: Meeting) -> str:
+    """Printable HTML for the same minutes (email / paper / PDF via the browser)."""
+    md = render_minutes(meeting)
+    escaped = (
+        md.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    title = f"{meeting.organization or 'Meeting'} minutes {meeting.date or ''}".strip()
+    return (
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"/>"
+        f"<title>{title}</title>"
+        "<style>body{font:16px/1.45 Georgia,serif;max-width:40rem;margin:2rem auto;padding:0 1rem}"
+        "pre{white-space:pre-wrap;font:inherit}</style></head><body>"
+        f"<pre>{escaped}</pre></body></html>\n"
+    )

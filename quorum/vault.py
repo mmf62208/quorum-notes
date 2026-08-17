@@ -12,6 +12,8 @@ from typing import Any
 from .config import vault_dir
 from .minutes import Meeting, enforce_motion_rules, render_minutes
 from .naming import meeting_stem
+from .retention import should_delete_audio
+from .templates import opening_for
 from . import settings as app_settings
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{4,120}$")
@@ -82,6 +84,8 @@ def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
     fields.setdefault("roster", list(prefs.get("roster") or []))
     fields.setdefault("roberts", bool(prefs.get("roberts", True)))
     fields.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
+    if "opening" not in fields:
+        fields["opening"] = opening_for(str(prefs.get("template") or "sal"))
     stem = fields.get("file_stem") or meeting_stem(
         fields.get("organization", ""),
         fields.get("title", "Regular Meeting"),
@@ -113,12 +117,45 @@ def load_meeting(meeting_id: str) -> Meeting:
     return meeting
 
 
+def delete_audio_files(meeting_id: str) -> int:
+    folder = _meeting_dir(meeting_id)
+    if not folder.is_dir():
+        return 0
+    removed = 0
+    for wav in folder.glob("*.wav"):
+        wav.unlink()
+        removed += 1
+    return removed
+
+
+def apply_retention(meeting: Meeting) -> bool:
+    """Delete the tape when the user's retention policy says so. Minutes stay."""
+    prefs = app_settings.load_settings()
+    policy = str(prefs.get("retention") or "until_approved")
+    folder = _meeting_dir(meeting.id)
+    wavs = list(folder.glob("*.wav")) if folder.is_dir() else []
+    recorded_at = None
+    if wavs:
+        newest = max(wavs, key=lambda p: p.stat().st_mtime)
+        recorded_at = datetime.fromtimestamp(newest.stat().st_mtime, tz=timezone.utc)
+    if should_delete_audio(
+        policy,
+        minutes_approved=bool(meeting.minutes_approved),
+        recorded_at=recorded_at,
+    ):
+        delete_audio_files(meeting.id)
+        meeting.has_audio = False
+        return True
+    return False
+
+
 def save_meeting(meeting: Meeting) -> Meeting:
     enforce_motion_rules(meeting)
     folder = _meeting_dir(meeting.id)
     folder.mkdir(parents=True, exist_ok=True)
+    apply_retention(meeting)
     meeting.updated_at = _now()
-    meeting.has_audio = (folder / "audio.wav").is_file() or any(folder.glob("*.wav"))
+    meeting.has_audio = any(folder.glob("*.wav"))
     meeting.has_transcript = (folder / "transcript.txt").is_file()
     (folder / "meeting.json").write_text(
         json.dumps(meeting.to_dict(), indent=2, ensure_ascii=False) + "\n",

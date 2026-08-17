@@ -63,11 +63,24 @@
         <button type="button" id="btn-stop" class="stop-btn" disabled>Stop</button>
         <div class="meter-wrap">
           <div class="meter"><i id="meter-fill"></i></div>
-          <span id="meter-label">Mic idle — tap Record</span>
+          <span id="meter-label">Mic idle — pick a mic to hear the room</span>
         </div>
         <span id="clock">0:00</span>
       </div>
-      <audio id="player" controls></audio>
+      <div class="row compact">
+        <label>Microphone
+          <select id="mic-device"></select>
+        </label>
+        <button type="button" id="btn-arm-mic">Hear the room</button>
+      </div>
+      <div class="row compact player-bar">
+        <audio id="player" controls></audio>
+        <button type="button" id="btn-back15">−15s</button>
+        <button type="button" id="btn-fwd15">+15s</button>
+        <button type="button" id="btn-speed">1×</button>
+        <a id="btn-print" class="file-btn" href="#" target="_blank" rel="noopener">Print / PDF</a>
+      </div>
+      <div id="marks" class="chips"></div>
 
       <div class="row compact">
         <label>Title <input id="title" /></label>
@@ -81,6 +94,7 @@
       <div class="row compact">
         <input id="new-person" placeholder="Add name" />
         <button type="button" id="btn-add-person">Add</button>
+        <button type="button" id="btn-late">Mark late</button>
         <label class="file-btn">Sign-in photo
           <input type="file" id="sign-in-photo" accept="image/*" capture="environment" hidden />
         </label>

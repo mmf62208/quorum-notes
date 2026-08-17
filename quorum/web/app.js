@@ -4,7 +4,7 @@ let settings = {};
 let current = null;
 let rec = { ctx: null, proc: null, stream: null, chunks: [], started: 0, analyser: null, raf: 0 };
 let pendingRole = null;
-let listenCtx = null;
+let playbackRate = 1;
 
 function lines(text) {
   return String(text || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
@@ -88,6 +88,26 @@ function renderPeople() {
     b.onclick = () => onPerson(name);
     box.appendChild(b);
   });
+  renderMarks();
+}
+
+function renderMarks() {
+  const box = $("marks");
+  if (!box) return;
+  box.innerHTML = "";
+  (current.speaker_marks || []).forEach((mark) => {
+    const b = document.createElement("button");
+    const mins = Math.floor(mark.seconds / 60);
+    const secs = String(Math.floor(mark.seconds % 60)).padStart(2, "0");
+    b.type = "button";
+    b.textContent = `${mins}:${secs} ${mark.name}`;
+    b.onclick = () => {
+      const player = $("player");
+      player.currentTime = mark.seconds;
+      player.play().catch(() => {});
+    };
+    box.appendChild(b);
+  });
 }
 
 function onPerson(name) {
@@ -102,6 +122,16 @@ function onPerson(name) {
   }
   if (pendingRole === "1st" || pendingRole === "2nd") {
     applyMotionPerson(name);
+    return;
+  }
+  if (pendingRole === "late") {
+    current.late = current.late || [];
+    if (!current.late.includes(name)) current.late.push(name);
+    if (!(current.present || []).includes(name)) current.present.push(name);
+    pendingRole = null;
+    $("save-status").textContent = `${name} arrived late`;
+    renderPeople();
+    updateQuorum();
     return;
   }
   const present = new Set(current.present || []);
@@ -221,7 +251,9 @@ async function openMeeting(id) {
   $("player").src = current.has_audio ? `/api/meetings/${id}/audio?t=${Date.now()}` : "";
   $("btn-download").href = `/api/meetings/${id}/minutes.md`;
   $("btn-download").setAttribute("download", `${current.file_stem || id}-minutes.md`);
+  $("btn-print").href = `/api/meetings/${id}/print.html`;
   await refreshList();
+  armMic().catch(() => {});
 }
 
 async function saveMeeting() {
@@ -304,35 +336,81 @@ function encodeWav(floatChunks, sampleRate) {
   return new Blob([buffer], { type: "audio/wav" });
 }
 
-async function startRec() {
-  rec.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+function selectedMicId() {
+  return $("mic-device") ? $("mic-device").value : "";
+}
+
+async function fillMics() {
+  const sel = $("mic-device");
+  if (!sel || !navigator.mediaDevices?.enumerateDevices) return;
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const inputs = devices.filter((d) => d.kind === "audioinput");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  if (!inputs.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Default microphone";
+    sel.appendChild(opt);
+    return;
+  }
+  inputs.forEach((d, i) => {
+    const opt = document.createElement("option");
+    opt.value = d.deviceId;
+    opt.textContent = d.label || `Microphone ${i + 1}`;
+    sel.appendChild(opt);
+  });
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+
+async function openMic(recordChunks) {
+  if (rec.stream) rec.stream.getTracks().forEach((t) => t.stop());
+  if (rec.ctx) await rec.ctx.close().catch(() => {});
+  cancelAnimationFrame(rec.raf);
+  const constraint = selectedMicId()
+    ? { audio: { deviceId: { exact: selectedMicId() } } }
+    : { audio: true };
+  rec.stream = await navigator.mediaDevices.getUserMedia(constraint);
   rec.ctx = new AudioContext();
   const src = rec.ctx.createMediaStreamSource(rec.stream);
   rec.analyser = rec.ctx.createAnalyser();
   rec.analyser.fftSize = 2048;
-  rec.proc = rec.ctx.createScriptProcessor(4096, 1, 1);
-  rec.chunks = [];
-  rec.proc.onaudioprocess = (ev) => {
-    rec.chunks.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
-  };
   src.connect(rec.analyser);
-  src.connect(rec.proc);
-  rec.proc.connect(rec.ctx.destination);
+  rec.proc = null;
+  rec.chunks = [];
+  if (recordChunks) {
+    rec.proc = rec.ctx.createScriptProcessor(4096, 1, 1);
+    rec.proc.onaudioprocess = (ev) => {
+      rec.chunks.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
+    };
+    src.connect(rec.proc);
+    rec.proc.connect(rec.ctx.destination);
+  }
+  await fillMics();
+  tickMeter();
+}
+
+async function armMic() {
+  await openMic(false);
+  $("meter-label").textContent = "Listening — confirm the meter moves before Record";
+}
+
+async function startRec() {
+  await openMic(true);
   rec.started = Date.now();
   $("btn-rec").disabled = true;
   $("btn-rec").classList.add("hot");
   $("btn-stop").disabled = false;
   $("rec-banner").hidden = false;
-  tickMeter();
 }
 
 async function stopRec() {
   if (rec.proc) rec.proc.disconnect();
+  const chunks = rec.chunks;
+  const rate = rec.ctx ? rec.ctx.sampleRate : 44100;
   if (rec.stream) rec.stream.getTracks().forEach((t) => t.stop());
   cancelAnimationFrame(rec.raf);
-  const rate = rec.ctx ? rec.ctx.sampleRate : 44100;
   if (rec.ctx) await rec.ctx.close();
-  const blob = encodeWav(rec.chunks, rate);
   rec = { ctx: null, proc: null, stream: null, chunks: [], started: 0, analyser: null, raf: 0 };
   $("btn-rec").disabled = false;
   $("btn-rec").classList.remove("hot");
@@ -340,10 +418,12 @@ async function stopRec() {
   $("rec-banner").hidden = true;
   $("meter-label").textContent = "Saved recording";
   if (!current?.id) return;
+  const blob = encodeWav(chunks, rate);
   await fetch(`/api/meetings/${current.id}/audio`, { method: "POST", body: blob });
   $("player").src = `/api/meetings/${current.id}/audio?t=${Date.now()}`;
   current.has_audio = true;
   await saveMeeting();
+  armMic().catch(() => {});
 }
 
 function fileToDataUrl(file) {
@@ -425,6 +505,25 @@ $("btn-new").onclick = async () => {
 $("btn-save").onclick = () => saveMeeting().catch((e) => { $("save-status").textContent = e.message; });
 $("btn-rec").onclick = () => startRec().catch((e) => { $("meter-label").textContent = e.message; });
 $("btn-stop").onclick = () => stopRec().catch((e) => { $("meter-label").textContent = e.message; });
+$("btn-arm-mic").onclick = () => armMic().catch((e) => { $("meter-label").textContent = e.message; });
+$("mic-device").onchange = () => armMic().catch((e) => { $("meter-label").textContent = e.message; });
+$("btn-back15").onclick = () => {
+  const p = $("player");
+  p.currentTime = Math.max(0, (p.currentTime || 0) - 15);
+};
+$("btn-fwd15").onclick = () => {
+  const p = $("player");
+  p.currentTime = (p.currentTime || 0) + 15;
+};
+$("btn-speed").onclick = () => {
+  playbackRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+  $("player").playbackRate = playbackRate;
+  $("btn-speed").textContent = `${playbackRate}×`;
+};
+$("btn-late").onclick = () => {
+  pendingRole = "late";
+  $("save-status").textContent = "Tap who arrived late.";
+};
 $("btn-add-person").onclick = () => {
   const name = $("new-person").value.trim();
   if (!name || !current) return;
