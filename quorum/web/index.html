@@ -36,6 +36,7 @@
     <label>Usual roster (one name per line)
       <textarea id="wiz-roster" rows="8"></textarea>
     </label>
+    <p class="hint" id="wiz-error"></p>
     <button type="button" class="primary big" id="btn-wiz-save">Save and start</button>
   </section>
 
@@ -62,8 +63,8 @@
       <p class="hint" id="vault-path"></p>
     </aside>
 
-    <section id="console" hidden>
-      <div class="live-bar">
+    <p id="boot-error" class="hint" hidden></p>
+    <div class="live-bar">
         <button type="button" id="btn-rec" class="rec-btn">Record</button>
         <button type="button" id="btn-stop" class="stop-btn" disabled>Stop</button>
         <div class="meter-wrap">
@@ -71,8 +72,8 @@
           <span id="meter-label">Mic idle — pick a mic to hear the room</span>
         </div>
         <span id="clock">0:00</span>
-      </div>
-      <div class="row compact">
+    </div>
+    <div class="row compact room-devices">
         <label>Microphone
           <select id="mic-device"></select>
         </label>
@@ -80,7 +81,8 @@
           <select id="spk-device"></select>
         </label>
         <button type="button" id="btn-arm-mic">Hear the room</button>
-      </div>
+    </div>
+    <section id="console" hidden>
       <div class="row compact player-bar">
         <audio id="player" controls></audio>
         <button type="button" id="btn-back15">−15s</button>

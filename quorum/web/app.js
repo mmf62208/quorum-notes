@@ -588,48 +588,78 @@ function showWizard(force = false) {
   $("wizard").hidden = false;
 }
 
+function showBootError(msg) {
+  const el = $("boot-error") || $("vault-path") || $("wiz-error");
+  if (el) {
+    el.hidden = false;
+    el.textContent = msg;
+  }
+}
+
 async function boot() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
-  const status = await api("/api/status");
-  settings = status.settings || {};
-  const urls = (status.lan_urls || []).join(" · ");
-  $("vault-path").textContent = `${status.vault} · retention: ${settings.retention || "until_approved"}${urls ? " · phones: " + urls : ""}`;
-  showWizard();
-  await refreshList();
+  try {
+    const status = await api("/api/status");
+    settings = status.settings || {};
+    const urls = (status.lan_urls || []).join(" · ");
+    $("vault-path").textContent = `${status.vault} · retention: ${settings.retention || "until_approved"}${urls ? " · phones: " + urls : ""}`;
+    showWizard();
+    await refreshList();
+    await fillMics().catch(() => {});
+  } catch (e) {
+    showBootError(`Quorum is not talking to this page (${e.message}). Use Start Quorum and stay on http://127.0.0.1:4840, then click Hear the room.`);
+    showWizard(true);
+  }
 }
 
 $("btn-wiz-save").onclick = async () => {
-  settings = await api("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      setup_complete: true,
-      organization: $("wiz-org").value.trim(),
-      submitted_by: $("wiz-name").value.trim(),
-      submitted_office: $("wiz-office").value.trim(),
-      template: $("wiz-template").value,
-      retention: $("wiz-retention").value,
-      roberts: $("wiz-roberts").checked,
-      roster: lines($("wiz-roster").value),
-    }),
-  }).then((d) => d.settings);
-  $("wizard").hidden = true;
+  const err = $("wiz-error");
+  if (err) err.textContent = "";
+  try {
+    settings = await api("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        setup_complete: true,
+        organization: $("wiz-org").value.trim(),
+        submitted_by: $("wiz-name").value.trim(),
+        submitted_office: $("wiz-office").value.trim(),
+        template: $("wiz-template").value,
+        retention: $("wiz-retention").value,
+        roberts: $("wiz-roberts").checked,
+        roster: lines($("wiz-roster").value),
+      }),
+    }).then((d) => d.settings);
+    $("wizard").hidden = true;
+    if ($("vault-path")) $("vault-path").textContent = "Setup saved on this computer.";
+  } catch (e) {
+    if (err) err.textContent = e.message || "Could not save setup";
+    else showBootError(e.message || "Could not save setup");
+  }
 };
 
 $("btn-setup").onclick = () => showWizard(true);
 $("btn-demo").onclick = async () => {
-  const data = await api("/api/demo", { method: "POST" });
-  await openMeeting(data.meeting.id);
+  try {
+    const data = await api("/api/demo", { method: "POST" });
+    await openMeeting(data.meeting.id);
+  } catch (e) {
+    showBootError(e.message || "Dry-run failed");
+  }
 };
 $("btn-new").onclick = async () => {
-  const data = await api("/api/meetings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "Regular Meeting" }),
-  });
-  await openMeeting(data.meeting.id);
+  try {
+    const data = await api("/api/meetings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Regular Meeting" }),
+    });
+    await openMeeting(data.meeting.id);
+  } catch (e) {
+    showBootError(e.message || "Could not start meeting");
+  }
 };
 $("btn-save").onclick = () => saveMeeting().catch((e) => { $("save-status").textContent = e.message; });
 $("btn-rec").onclick = () => startRec().catch((e) => {
@@ -860,5 +890,5 @@ $("btn-delete").onclick = async () => {
 };
 
 boot().catch((e) => {
-  $("vault-path").textContent = e.message;
+  showBootError(e.message);
 });
