@@ -10,26 +10,17 @@ from .config import vault_dir
 
 DEFAULTS: dict[str, Any] = {
     "setup_complete": False,
-    "organization": "SAL Post 484 Squadron",
-    "submitted_by": "Mike Featherstone",
-    "submitted_office": "Adjutant, SAL Post 484",
+    "organization": "",
+    "submitted_by": "",
+    "submitted_office": "Adjutant",
     "template": "sal",
     "roberts": True,
     "retention": "until_approved",
-    "default_location": "Post home",
+    "default_location": "",
     "called_to_order_by": "Commander",
     "roster": [
-        "Jeff Shumaker",
-        "Herm Clear",
-        "Gene Newell",
-        "Mike Featherstone",
-        "Ted Ruser",
-        "Kirk Dewey",
-        "Paul Nichols",
-        "William Wood",
-        "Mike Gerlofs",
-        "Randy Robbins",
-        "William Fayling",
+        "Member A",
+        "Member B",
     ],
 }
 

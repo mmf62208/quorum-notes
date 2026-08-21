@@ -4,7 +4,7 @@ For the adjutant or secretary running a meeting on a laptop or phone.
 
 ## Before the meeting
 
-1. `python3 -m quorum` then open the URL it prints (usually http://127.0.0.1:4840).
+1. Unzip, double-click **Start Quorum**. The console opens at http://127.0.0.1:4840. Fallback: `python3 -m quorum`.
 2. Complete **Setup** once: organization, your name, roster, how long to keep recordings.
 3. For phones in the hall: `QUORUM_HOST=0.0.0.0 python3 -m quorum` and open the **phones:** URL on the same Wi‑Fi.
 4. Tap **Hear the room**. The meter must move before you trust Record.

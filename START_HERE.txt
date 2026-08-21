@@ -1,0 +1,14 @@
+Quorum — meeting minutes on this computer
+
+Unzip this archive. Open the one folder you get.
+Double-click Start Quorum (Start Quorum.command on a Mac, Start Quorum.bat on Windows, or start-quorum.sh on Linux).
+The meeting console opens at http://127.0.0.1:4840.
+
+Complete Setup once (organization, your name, roster, how long to keep recordings).
+Tap Dry-run to practice a whole meeting.
+After the meeting: Email, Download, or Print the minutes.
+
+Nothing leaves this computer unless you tap Polish with SpaceXAI.
+
+If Start Quorum does not run, open a terminal in this folder and type: python3 -m quorum
+Python 3.11 or newer is required.

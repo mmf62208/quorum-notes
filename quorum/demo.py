@@ -1,4 +1,4 @@
-"""A scripted Post 484 dry-run so testers can walk a whole meeting."""
+"""A scripted dry-run so testers can walk a whole meeting."""
 
 from __future__ import annotations
 
@@ -13,21 +13,19 @@ def seed_post484_dry_run() -> object:
     roster = list(prefs.get("roster") or [])
     if len(roster) < 3:
         roster = [
-            "Jeff Shumaker",
-            "Herm Clear",
-            "Mike Featherstone",
-            "Ted Ruser",
-            "William Wood",
+            "Member A",
+            "Member B",
+            "Member C",
         ]
     present = roster[: max(3, min(len(roster), 5))]
     meeting = vault.create_meeting(
         {
             "title": "Dry-run Regular Meeting",
-            "organization": prefs.get("organization") or "SAL Post 484 Squadron",
-            "location": prefs.get("default_location") or "Post home",
-            "called_to_order_by": prefs.get("called_to_order_by") or "Commander Jeff Shumaker",
-            "submitted_by": prefs.get("submitted_by") or "Mike Featherstone",
-            "submitted_office": prefs.get("submitted_office") or "Adjutant, SAL Post 484",
+            "organization": prefs.get("organization") or "Example Squadron",
+            "location": prefs.get("default_location") or "Meeting hall",
+            "called_to_order_by": prefs.get("called_to_order_by") or "Commander",
+            "submitted_by": prefs.get("submitted_by") or "Secretary",
+            "submitted_office": prefs.get("submitted_office") or "Adjutant",
             "roster": roster,
             "present": present,
             "opening": list(SAL_OPENING),
@@ -35,7 +33,7 @@ def seed_post484_dry_run() -> object:
             "reports": [
                 Report(
                     title="Finance",
-                    presenter="Ted Ruser",
+                    presenter=present[2] if len(present) > 2 else "Member C",
                     body="Checking and savings reports are ready for the floor.",
                 )
             ],

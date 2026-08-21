@@ -6,12 +6,14 @@ Built for in-person lodge/post meetings first (phone in your hand), with desktop
 
 ## Run on this computer
 
+Unzip, double-click **Start Quorum**. The meeting console opens at [http://127.0.0.1:4840](http://127.0.0.1:4840). First launch asks org, retention, and roster.
+
+Fallback if the launcher does not start:
+
 ```bash
 cd ~/Projects/quorum-notes
 python3 -m quorum
 ```
-
-Open [http://127.0.0.1:4840](http://127.0.0.1:4840). First launch asks org, retention, and roster.
 
 ### Give it to another desktop tester
 
@@ -23,9 +25,9 @@ Send `dist/quorum-tester.zip`. They need Python 3.11+:
 
 ```bash
 unzip quorum-tester.zip
-cd quorum-notes   # or whatever folder unzip created
-python3 -m quorum
 ```
+
+Open the one `quorum-notes` folder and double-click **Start Quorum**. Fallback: `python3 -m quorum`.
 
 ### Phones at the hall (same Wi‑Fi)
 
@@ -41,7 +43,7 @@ Add to Home Screen from the phone browser for a full-screen tester app.
 
 ## In a meeting
 
-**Dry-run** seeds a Post 484 practice meeting so you can walk Opening → Roll call → Previous minutes → Reports → Motions → Adjourn → Email.
+**Dry-run** seeds a practice meeting so you can walk Opening → Roll call → Previous minutes → Reports → Motions → Adjourn → Email.
 
 The sidebar shows phone URLs when the laptop is on Wi‑Fi (use `QUORUM_HOST=0.0.0.0` so those URLs work).
 

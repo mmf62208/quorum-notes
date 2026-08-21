@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -258,4 +259,8 @@ def serve() -> None:
     print(f"{config.APP_NAME} at http://{config.HOST}:{config.PORT}")
     print(f"Vault: {config.vault_dir()}")
     print("AI is off until XAI_API_KEY is set and you click an opt-in action.")
+    try:
+        webbrowser.open(f"http://127.0.0.1:{config.PORT}")
+    except Exception:
+        pass
     httpd.serve_forever()
