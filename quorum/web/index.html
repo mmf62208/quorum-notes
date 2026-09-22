@@ -12,32 +12,36 @@
   <div id="rec-banner" hidden>RECORDING — this meeting is being captured on this device</div>
 
   <section id="wizard" class="sheet" hidden>
-    <h1>Set up Quorum</h1>
-    <p class="hint">Once, on this device. Meetings stay here unless you email them or opt into AI.</p>
-    <label>Organization <input id="wiz-org" /></label>
-    <label>Your name <input id="wiz-name" /></label>
-    <label>Office <input id="wiz-office" /></label>
-    <label>Template
-      <select id="wiz-template">
-        <option value="sal">SAL / civic lodge</option>
-        <option value="generic">Generic Robert’s Rules</option>
-        <option value="notes">Notes only</option>
-      </select>
-    </label>
-    <label>Keep recordings
-      <select id="wiz-retention">
-        <option value="until_approved">Until I mark minutes approved</option>
-        <option value="7d">7 days</option>
-        <option value="14d">14 days</option>
-        <option value="keep">Until I delete them</option>
-      </select>
-    </label>
-    <label class="check"><input type="checkbox" id="wiz-roberts" checked /> Light Robert’s Rules (1st / 2nd / vote)</label>
-    <label>Usual roster (one name per line)
-      <textarea id="wiz-roster" rows="8"></textarea>
-    </label>
-    <p class="hint" id="wiz-error"></p>
-    <button type="button" class="primary big" id="btn-wiz-save">Save and start</button>
+    <div class="wiz-body">
+      <h1>Set up Quorum</h1>
+      <p class="hint">Once, on this device. Meetings stay here unless you email them or opt into AI.</p>
+      <label>Organization <input id="wiz-org" /></label>
+      <label>Your name <input id="wiz-name" /></label>
+      <label>Office <input id="wiz-office" /></label>
+      <label>Template
+        <select id="wiz-template">
+          <option value="sal">SAL / civic lodge</option>
+          <option value="generic">Generic Robert’s Rules</option>
+          <option value="notes">Notes only</option>
+        </select>
+      </label>
+      <label>Keep recordings
+        <select id="wiz-retention">
+          <option value="until_approved">Until I mark minutes approved</option>
+          <option value="7d">7 days</option>
+          <option value="14d">14 days</option>
+          <option value="keep">Until I delete them</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="wiz-roberts" checked /> Light Robert’s Rules (1st / 2nd / vote)</label>
+      <label>Usual roster (one name per line)
+        <textarea id="wiz-roster" rows="8"></textarea>
+      </label>
+      <p class="hint" id="wiz-error"></p>
+    </div>
+    <div class="wiz-footer">
+      <button type="button" class="primary big" id="btn-wiz-save">Save and start</button>
+    </div>
   </section>
 
   <header class="top">
