@@ -24,7 +24,6 @@ class WizardLayoutTests(unittest.TestCase):
         self.assertIn("position: sticky", css)
         self.assertIn("#wizard #wiz-roster", css)
         self.assertIn("max-height: min(16rem, 40vh)", css)
-        self.assertIn("#btn-wiz-save", html)
         self.assertLess(
             html.index('id="wiz-roster"'),
             html.index('id="btn-wiz-save"'),
