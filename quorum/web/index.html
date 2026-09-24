@@ -124,11 +124,23 @@
         <label class="file-btn">Sign-in photo
           <input type="file" id="sign-in-photo" accept="image/*" capture="environment" hidden />
         </label>
-        <label class="file-btn">Document
-          <input type="file" id="doc-photo" accept="image/*" capture="environment" hidden />
+        <label>Document label
+          <select id="doc-label">
+            <option value="finance">Finance</option>
+            <option value="agenda">Agenda</option>
+            <option value="handout">Handout</option>
+            <option value="other" selected>Other</option>
+          </select>
+        </label>
+        <label class="file-btn">Document photo
+          <input type="file" id="doc-photo" accept="image/*" capture="environment" multiple hidden />
+        </label>
+        <label class="file-btn">Attach file
+          <input type="file" id="doc-file" multiple hidden />
         </label>
       </div>
       <div id="photos" class="thumbs"></div>
+      <ul id="doc-list"></ul>
       <div id="signin-review" hidden>
         <h3>Sign-in sheet — tick who you see, then apply</h3>
         <div id="signin-names" class="chips"></div>
@@ -155,6 +167,24 @@
         <textarea id="report-body" rows="2" placeholder="Checking ending balance…"></textarea>
         <button type="button" id="btn-add-report">Add report</button>
         <ul id="report-list"></ul>
+        <h3>Meeting documents</h3>
+        <div class="row compact">
+          <label>Label
+            <select id="doc-label-reports">
+              <option value="finance" selected>Finance</option>
+              <option value="agenda">Agenda</option>
+              <option value="handout">Handout</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label class="file-btn">Photo
+            <input type="file" id="doc-camera-reports" accept="image/*" capture="environment" multiple hidden />
+          </label>
+          <label class="file-btn">Attach file
+            <input type="file" id="doc-file-reports" multiple hidden />
+          </label>
+        </div>
+        <ul id="doc-list-reports"></ul>
       </div>
 
       <div id="step-old_business" class="step-panel" hidden>

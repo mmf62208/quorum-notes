@@ -16,7 +16,7 @@ For the adjutant or secretary running a meeting on a laptop or phone.
 3. Tap names present. **Mark late** then tap. While recording, tap a name to mark who is talking.
 4. Motions: type the motion → **1st** → tap → **2nd** → tap → **Carried** / **Failed**. No second, no carry.
 5. Keys: `1` first, `2` second, `V` carried, `Ctrl+Z` undo.
-6. Sign-in photo → tick names you see → **Apply sign-in**.
+6. Sign-in photo → tick names you see → **Apply sign-in**. Attach finance / agenda / handout photos or files on roll call or Reports.
 
 ## After
 

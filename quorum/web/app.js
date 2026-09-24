@@ -40,6 +40,7 @@ function emptyMeeting(partial = {}) {
     takeaways: [],
     speaker_marks: [],
     photos: [],
+    documents: [],
     notes: "",
     adjournment: "",
     roberts: settings.roberts !== false,
@@ -64,6 +65,7 @@ function fillHeader() {
   $("rr-block").hidden = current.roberts === false;
   renderLists();
   renderSigninReview();
+  renderDocuments();
   showStep(current.agenda_index || 0);
 }
 
@@ -285,10 +287,37 @@ function renderPhotos() {
   const box = $("photos");
   box.innerHTML = "";
   (current.photos || []).forEach((p) => {
+    if (!p.data_url) return;
     const img = document.createElement("img");
     img.src = p.data_url;
     img.alt = p.name;
     box.appendChild(img);
+  });
+}
+
+function formatDocBytes(n) {
+  const size = Number(n) || 0;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderDocuments() {
+  const items = current && current.documents ? current.documents : [];
+  const html = items.length
+    ? items
+        .map((d) => {
+          const href = current.id
+            ? `/api/meetings/${encodeURIComponent(current.id)}/documents/${encodeURIComponent(d.filename)}`
+            : "#";
+          const when = d.time ? ` · ${d.time}` : "";
+          return `<li><a href="${href}" target="_blank" rel="noopener">${d.label || "other"} · ${d.filename} · ${formatDocBytes(d.bytes)}${when}</a></li>`;
+        })
+        .join("")
+    : `<li class="hint">No documents attached</li>`;
+  ["doc-list", "doc-list-reports"].forEach((id) => {
+    const el = $(id);
+    if (el) el.innerHTML = html;
   });
 }
 
@@ -317,6 +346,7 @@ async function openMeeting(id) {
   renderMotions();
   renderTakeaways();
   renderPhotos();
+  renderDocuments();
   renderSigninReview();
   updateQuorum();
   $("minutes").textContent = data.markdown;
@@ -612,6 +642,34 @@ async function addPhoto(file, kind) {
   await saveMeeting();
 }
 
+async function addDocuments(fileList, label) {
+  const files = [...(fileList || [])].filter(Boolean);
+  if (!files.length) return;
+  if (!hasOpenMeeting()) {
+    $("save-status").textContent = "Open a meeting first";
+    return;
+  }
+  $("save-status").textContent = "Saving document…";
+  try {
+    for (const file of files) {
+      const params = new URLSearchParams({
+        label: label || "other",
+        filename: file.name || "document",
+      });
+      const data = await api(`/api/meetings/${current.id}/documents?${params}`, {
+        method: "POST",
+        body: file,
+      });
+      current = data.meeting;
+    }
+    renderDocuments();
+    $("save-status").textContent =
+      files.length === 1 ? `Attached ${files[0].name || "document"}` : `Attached ${files.length} documents`;
+  } catch (e) {
+    $("save-status").textContent = e.message || "Could not save document";
+  }
+}
+
 function mailto(subject, body) {
   const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = url;
@@ -854,7 +912,20 @@ $("btn-takeaway").onclick = () => {
   renderTakeaways();
 };
 $("sign-in-photo").onchange = (e) => addPhoto(e.target.files[0], "sign_in");
-$("doc-photo").onchange = (e) => addPhoto(e.target.files[0], "document");
+function bindDocInput(inputId, labelId) {
+  const input = $(inputId);
+  if (!input) return;
+  input.onchange = (e) => {
+    const label = ($(labelId) && $(labelId).value) || "other";
+    addDocuments(e.target.files, label).finally(() => {
+      e.target.value = "";
+    });
+  };
+}
+bindDocInput("doc-photo", "doc-label");
+bindDocInput("doc-file", "doc-label");
+bindDocInput("doc-camera-reports", "doc-label-reports");
+bindDocInput("doc-file-reports", "doc-label-reports");
 $("btn-email").onclick = async () => {
   await saveMeeting();
   const mail = await api(`/api/meetings/${current.id}/email`);

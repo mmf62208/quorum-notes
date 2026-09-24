@@ -143,6 +143,17 @@ class HttpBotTests(unittest.TestCase):
         self.assertIn("Ted Ruser", signed["meeting"]["present"])
         self.assertNotIn("Not On Roster", signed["meeting"]["present"])
 
+        attached = self._json(
+            "POST",
+            f"/api/meetings/{mid}/documents?label=finance&filename=finance-sheet.jpg",
+            raw=b"sheet-bytes",
+        )
+        self.assertEqual(attached["document"]["label"], "finance")
+        self.assertEqual(attached["document"]["bytes"], len(b"sheet-bytes"))
+        self.assertTrue(
+            (Path(os.environ["QUORUM_VAULT"]) / "meetings" / mid / "docs" / "finance-sheet.jpg").is_file()
+        )
+
         audio = self._json("POST", f"/api/meetings/{mid}/audio", raw=b"RIFF____WAVEfmt ")
         self.assertTrue(audio["ok"])
         wav = self._json("GET", f"/api/meetings/{mid}/audio")
