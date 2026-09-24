@@ -70,6 +70,33 @@ class Photo:
     data_url: str = ""
 
 
+DOC_LABELS = ("finance", "agenda", "handout", "other")
+
+
+def normalize_doc_label(label: str) -> str:
+    key = (label or "other").strip().casefold()
+    return key if key in DOC_LABELS else "other"
+
+
+@dataclass
+class MeetingDocument:
+    """Vault file attached to a meeting. Bytes live on disk, not in this record."""
+
+    label: str = "other"
+    filename: str = ""
+    bytes: int = 0
+    time: str = ""
+
+
+def _as_document(item: Any) -> MeetingDocument:
+    if isinstance(item, MeetingDocument):
+        return item
+    if not isinstance(item, dict):
+        raise TypeError("invalid document")
+    known = {f.name for f in MeetingDocument.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+    return MeetingDocument(**{k: v for k, v in item.items() if k in known})
+
+
 @dataclass
 class Meeting:
     id: str
@@ -99,6 +126,7 @@ class Meeting:
     speaker_marks: list[SpeakerMark] = field(default_factory=list)
     takeaways: list[Takeaway] = field(default_factory=list)
     photos: list[Photo] = field(default_factory=list)
+    documents: list[MeetingDocument] = field(default_factory=list)
     file_stem: str = ""
     roberts: bool = True
     minutes_approved: bool = False
@@ -158,6 +186,7 @@ class Meeting:
             Takeaway(**t) if isinstance(t, dict) else t for t in payload.get("takeaways", [])
         ]
         payload["photos"] = [Photo(**p) if isinstance(p, dict) else p for p in payload.get("photos", [])]
+        payload["documents"] = [_as_document(d) for d in payload.get("documents", [])]
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         return cls(**{k: v for k, v in payload.items() if k in known})
 

@@ -11,7 +11,7 @@ from typing import Any
 
 from .config import vault_dir
 from .agenda import clamp_agenda_index
-from .minutes import Meeting, enforce_motion_rules, render_minutes
+from .minutes import Meeting, MeetingDocument, enforce_motion_rules, normalize_doc_label, render_minutes
 from .naming import meeting_stem
 from .retention import should_delete_audio
 from .templates import opening_for
@@ -204,11 +204,67 @@ def read_transcript(meeting_id: str) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
 
+def _docs_dir(meeting_id: str) -> Path:
+    return _meeting_dir(meeting_id) / "docs"
+
+
+def _safe_filename(name: str) -> str:
+    raw = Path(name or "document").name
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("._") or "document"
+    return cleaned[:80]
+
+
+def _unique_doc_name(folder: Path, filename: str) -> str:
+    safe = _safe_filename(filename)
+    if not (folder / safe).exists():
+        return safe
+    stem = Path(safe).stem
+    suffix = Path(safe).suffix
+    for i in range(2, 200):
+        candidate = f"{stem}_{i}{suffix}"
+        if not (folder / candidate).exists():
+            return candidate
+    return f"{stem}_{uuid.uuid4().hex[:8]}{suffix}"
+
+
+def save_document(meeting_id: str, data: bytes, filename: str = "", label: str = "other") -> MeetingDocument:
+    """Write one file under meetings/<id>/docs/ and append metadata to meeting.json."""
+    if not data:
+        raise ValueError("empty document")
+    meeting = load_meeting(meeting_id)
+    folder = _docs_dir(meeting_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    stored = _unique_doc_name(folder, filename or "document")
+    dest = folder / stored
+    dest.write_bytes(data)
+    item = MeetingDocument(
+        label=normalize_doc_label(label),
+        filename=stored,
+        bytes=len(data),
+        time=_now(),
+    )
+    meeting.documents = list(meeting.documents or [])
+    meeting.documents.append(item)
+    save_meeting(meeting)
+    return item
+
+
+def document_path(meeting_id: str, filename: str) -> Path:
+    folder = _docs_dir(meeting_id)
+    dest = (folder / Path(filename).name).resolve()
+    root = folder.resolve()
+    if dest != root and root not in dest.parents:
+        raise ValueError("invalid filename")
+    return dest
+
+
 def delete_meeting(meeting_id: str) -> None:
     folder = _meeting_dir(meeting_id)
     if not folder.exists():
         raise FileNotFoundError(meeting_id)
-    for child in folder.iterdir():
+    for child in sorted(folder.rglob("*"), reverse=True):
         if child.is_file():
             child.unlink()
+        elif child.is_dir():
+            child.rmdir()
     folder.rmdir()

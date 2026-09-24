@@ -7,7 +7,7 @@ import mimetypes
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from . import ai, backup, config, demo, settings as app_settings, signin, vault
 from .agenda import agenda_status
@@ -88,6 +88,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not audio.is_file():
                     return _json(self, 404, {"error": "no audio"})
                 return _bytes(self, 200, audio.read_bytes(), "audio/wav")
+            if path.startswith("/api/meetings/") and "/documents/" in path:
+                parts = [p for p in path.split("/") if p]
+                if len(parts) == 5 and parts[3] == "documents":
+                    meeting_id, filename = unquote(parts[2]), unquote(parts[4])
+                    dest = vault.document_path(meeting_id, filename)
+                    if not dest.is_file():
+                        return _json(self, 404, {"error": "not found"})
+                    ctype = mimetypes.guess_type(dest.name)[0] or "application/octet-stream"
+                    return _bytes(self, 200, dest.read_bytes(), ctype)
             if path.startswith("/api/meetings/") and path.endswith("/print.html"):
                 meeting_id = path.split("/")[3]
                 meeting = vault.load_meeting(meeting_id)
@@ -180,6 +189,24 @@ class Handler(BaseHTTPRequestHandler):
                 vault.save_meeting(meeting)
                 payload = _meeting_payload(meeting)
                 payload["signin"] = result
+                return _json(self, 200, payload)
+            if path.startswith("/api/meetings/") and path.endswith("/documents"):
+                meeting_id = path.split("/")[3]
+                qs = parse_qs(parsed.query)
+                label = (qs.get("label") or ["other"])[0]
+                filename = (qs.get("filename") or ["document"])[0]
+                data = _read_body(self)
+                if not data:
+                    return _json(self, 400, {"error": "empty document"})
+                item = vault.save_document(meeting_id, data, filename=filename, label=label)
+                meeting = vault.load_meeting(meeting_id)
+                payload = _meeting_payload(meeting)
+                payload["document"] = {
+                    "label": item.label,
+                    "filename": item.filename,
+                    "bytes": item.bytes,
+                    "time": item.time,
+                }
                 return _json(self, 200, payload)
             if path == "/api/backup":
                 dest = backup.make_backup()
