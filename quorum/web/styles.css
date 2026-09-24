@@ -72,6 +72,40 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
 .sheet {
   position: fixed; inset: 0; background: var(--bg); z-index: 20; overflow: auto; padding: 1.25rem;
 }
+/* Short hall laptops: keep Save on screen; scroll the form, not the whole overlay. */
+#wizard.sheet:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
+  padding: 0;
+}
+#wizard .wiz-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+#wizard .wiz-footer {
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 0.75rem 1.25rem max(1.25rem, env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+#wizard #wiz-roster {
+  min-height: 6rem;
+  max-height: min(16rem, 40vh);
+  overflow-y: auto;
+  resize: vertical;
+}
+#wizard #btn-wiz-save { width: 100%; }
 .check { flex-direction: row; align-items: center; gap: 0.5rem; }
 pre { white-space: pre-wrap; background: #0f0d0b; border: 1px solid var(--line); padding: 0.8rem; }
 #player { width: 100%; margin: 0.5rem 0; }
