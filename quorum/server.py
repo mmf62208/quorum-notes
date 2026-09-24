@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import ai, backup, config, demo, settings as app_settings, signin, vault
+from . import ai, backup, config, demo, roster, settings as app_settings, signin, vault
 from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
 
@@ -154,6 +154,27 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/settings":
                 return _json(self, 200, {"settings": app_settings.save_settings(_read_json(self))})
+            if path == "/api/roster/parse":
+                text = str((_read_json(self) or {}).get("text") or "")
+                return _json(self, 200, roster.parse_roster(text))
+            if path.startswith("/api/meetings/") and path.endswith("/roster"):
+                meeting_id = path.split("/")[3]
+                meeting = vault.load_meeting(meeting_id)
+                names = (_read_json(self) or {}).get("names") or []
+                existing = list(meeting.roster)
+                keys = {signin.normalize_name(n) for n in existing if n}
+                for raw in names:
+                    name = " ".join(str(raw or "").split())
+                    if not name:
+                        continue
+                    key = signin.normalize_name(name)
+                    if key in keys:
+                        continue
+                    existing.append(name)
+                    keys.add(key)
+                meeting.roster = existing
+                vault.save_meeting(meeting)
+                return _json(self, 200, _meeting_payload(meeting))
             if path == "/api/demo":
                 meeting = demo.seed_post484_dry_run()
                 return _json(self, 201, _meeting_payload(meeting))

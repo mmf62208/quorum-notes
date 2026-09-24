@@ -7,8 +7,107 @@ let pendingRole = null;
 let playbackRate = 1;
 let undoStack = [];
 
-function lines(text) {
-  return String(text || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+function debounce(fn, ms) {
+  let timer = 0;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+function confirmedRosterNames(draft) {
+  const names = [];
+  const seen = new Set();
+  (draft || []).forEach((row) => {
+    const name = String((row && row.name) || "").replace(/\s+/g, " ").trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(name);
+  });
+  return names;
+}
+
+function renderRosterConfirm(listId, draft) {
+  const list = $(listId);
+  if (!list) return;
+  list.innerHTML = "";
+  (draft || []).forEach((row, index) => {
+    const li = document.createElement("li");
+    const input = document.createElement("input");
+    input.value = row.name || "";
+    input.setAttribute("aria-label", "Roster name");
+    input.oninput = () => {
+      draft[index].name = input.value;
+    };
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = row.title || "";
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "danger";
+    remove.textContent = "Remove";
+    remove.onclick = () => {
+      draft.splice(index, 1);
+      renderRosterConfirm(listId, draft);
+    };
+    li.appendChild(input);
+    li.appendChild(title);
+    li.appendChild(remove);
+    list.appendChild(li);
+  });
+}
+
+function showRosterFlags(elId, skipped) {
+  const el = $(elId);
+  if (!el) return;
+  const rows = skipped || [];
+  el.textContent = rows.length ? `Skipped: ${rows.map((r) => r.line).join(" · ")}` : "";
+}
+
+async function parseRosterText(text) {
+  return api("/api/roster/parse", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: String(text || "") }),
+  });
+}
+
+let wizRosterDraft = [];
+let meetRosterDraft = [];
+
+async function refreshWizardRosterDraft(text) {
+  const parsed = await parseRosterText(text);
+  wizRosterDraft = (parsed.entries || []).map((entry) => ({
+    name: entry.name,
+    title: entry.title || "",
+    raw: entry.raw || "",
+  }));
+  renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
+  showRosterFlags("wiz-roster-flags", parsed.skipped);
+  return parsed;
+}
+
+async function refreshMeetingRosterDraft(text) {
+  const parsed = await parseRosterText(text);
+  meetRosterDraft = (parsed.entries || []).map((entry) => ({
+    name: entry.name,
+    title: entry.title || "",
+    raw: entry.raw || "",
+  }));
+  renderRosterConfirm("meet-roster-confirm", meetRosterDraft);
+  showRosterFlags("meet-roster-flags", parsed.skipped);
+  return parsed;
+}
+
+function addDraftName(draft, name) {
+  const trimmed = String(name || "").replace(/\s+/g, " ").trim();
+  if (!trimmed) return draft;
+  const key = trimmed.toLowerCase();
+  if (draft.some((row) => String(row.name || "").toLowerCase() === key)) return draft;
+  draft.push({ name: trimmed, title: "", raw: trimmed });
+  return draft;
 }
 
 async function api(path, opts = {}) {
@@ -688,6 +787,10 @@ function showWizard(force = false) {
   $("wiz-roberts").checked = settings.roberts !== false;
   $("wiz-roster").value = (settings.roster || []).join("\n");
   $("wizard").hidden = false;
+  refreshWizardRosterDraft($("wiz-roster").value).catch(() => {
+    wizRosterDraft = (settings.roster || []).map((name) => ({ name, title: "", raw: name }));
+    renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
+  });
 }
 
 function showBootError(msg) {
@@ -722,6 +825,9 @@ $("btn-wiz-save").onclick = async () => {
   const err = $("wiz-error");
   if (err) err.textContent = "";
   try {
+    if (!wizRosterDraft.length && $("wiz-roster").value.trim()) {
+      await refreshWizardRosterDraft($("wiz-roster").value);
+    }
     settings = await api("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -733,7 +839,7 @@ $("btn-wiz-save").onclick = async () => {
         template: $("wiz-template").value,
         retention: $("wiz-retention").value,
         roberts: $("wiz-roberts").checked,
-        roster: lines($("wiz-roster").value),
+        roster: confirmedRosterNames(wizRosterDraft),
       }),
     }).then((d) => d.settings);
     $("wizard").hidden = true;
@@ -745,6 +851,17 @@ $("btn-wiz-save").onclick = async () => {
 };
 
 $("btn-setup").onclick = () => showWizard(true);
+$("wiz-roster").addEventListener(
+  "input",
+  debounce(() => {
+    refreshWizardRosterDraft($("wiz-roster").value).catch(() => {});
+  }, 200)
+);
+$("btn-wiz-roster-add").onclick = () => {
+  addDraftName(wizRosterDraft, $("wiz-roster-add-name").value);
+  $("wiz-roster-add-name").value = "";
+  renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
+};
 $("btn-demo").onclick = async () => {
   try {
     const data = await api("/api/demo", { method: "POST" });
@@ -859,6 +976,49 @@ $("btn-add-person").onclick = () => {
   if (!current.guests.includes(name)) current.guests.push(name);
   $("new-person").value = "";
   renderPeople();
+};
+if ($("meet-roster-paste")) {
+  $("meet-roster-paste").addEventListener(
+    "input",
+    debounce(() => {
+      refreshMeetingRosterDraft($("meet-roster-paste").value).catch(() => {});
+    }, 200)
+  );
+}
+if ($("btn-meet-roster-add")) {
+  $("btn-meet-roster-add").onclick = () => {
+    addDraftName(meetRosterDraft, $("meet-roster-add-name").value);
+    $("meet-roster-add-name").value = "";
+    renderRosterConfirm("meet-roster-confirm", meetRosterDraft);
+  };
+}
+$("btn-apply-roster").onclick = async () => {
+  if (!current) {
+    $("save-status").textContent = "Open a meeting first";
+    return;
+  }
+  try {
+    if (!meetRosterDraft.length && $("meet-roster-paste").value.trim()) {
+      await refreshMeetingRosterDraft($("meet-roster-paste").value);
+    }
+    const names = confirmedRosterNames(meetRosterDraft);
+    if (!names.length) {
+      $("save-status").textContent = "Confirm names before adding them to the roster";
+      return;
+    }
+    const data = await api(`/api/meetings/${current.id}/roster`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names }),
+    });
+    current = data.meeting;
+    fillHeader();
+    renderPeople();
+    $("minutes").textContent = data.markdown;
+    $("save-status").textContent = `Roster updated (${names.length} confirmed). Not marked present.`;
+  } catch (e) {
+    $("save-status").textContent = e.message || "Could not update roster";
+  }
 };
 $("btn-1st").onclick = () => {
   snapshot();

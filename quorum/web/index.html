@@ -34,9 +34,16 @@
         </select>
       </label>
       <label class="check"><input type="checkbox" id="wiz-roberts" checked /> Light Robert’s Rules (1st / 2nd / vote)</label>
-      <label>Usual roster (one name per line)
-        <textarea id="wiz-roster" rows="8"></textarea>
+      <label>Usual roster (paste names, titles, or CSV)
+        <textarea id="wiz-roster" rows="8" placeholder="Commander: Jane Doe&#10;Name, Title&#10;or one name per line"></textarea>
       </label>
+      <p class="hint">Review the list, then Save. Titles help parse names; they are not stored as officer memory.</p>
+      <ul id="wiz-roster-confirm" class="roster-confirm"></ul>
+      <p class="hint" id="wiz-roster-flags"></p>
+      <div class="row compact">
+        <input id="wiz-roster-add-name" placeholder="Add name" />
+        <button type="button" id="btn-wiz-roster-add">Add</button>
+      </div>
       <p class="hint" id="wiz-error"></p>
     </div>
     <div class="wiz-footer">
@@ -138,6 +145,16 @@
         <label class="file-btn">Attach file
           <input type="file" id="doc-file" multiple hidden />
         </label>
+      </div>
+      <label>Paste roster (titles or CSV)
+        <textarea id="meet-roster-paste" rows="3" placeholder="Commander: Jane Doe"></textarea>
+      </label>
+      <ul id="meet-roster-confirm" class="roster-confirm"></ul>
+      <p class="hint" id="meet-roster-flags"></p>
+      <div class="row compact">
+        <input id="meet-roster-add-name" placeholder="Add name to confirm list" />
+        <button type="button" id="btn-meet-roster-add">Add</button>
+        <button type="button" id="btn-apply-roster">Add confirmed names to roster</button>
       </div>
       <div id="photos" class="thumbs"></div>
       <ul id="doc-list"></ul>
