@@ -109,13 +109,13 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
   resize: vertical;
 }
 #wizard #btn-wiz-save { width: 100%; }
-.roster-confirm { list-style: none; padding: 0; margin: 0.35rem 0; }
+.roster-confirm { list-style: none; padding: 0; margin: 0.35rem 0; max-width: 36rem; }
 .roster-confirm li {
   display: flex; gap: 0.4rem; align-items: center; margin: 0.3rem 0;
 }
-.roster-confirm input { flex: 1; }
-.roster-confirm .title { color: var(--muted); font-size: 0.8rem; min-width: 6rem; }
-.roster-confirm .danger { padding: 0.35rem 0.55rem; }
+.roster-confirm input { flex: 1 1 auto; min-width: 8rem; }
+.roster-confirm .title { color: var(--muted); font-size: 0.8rem; flex: 0 1 9rem; }
+.roster-confirm .danger { padding: 0.35rem 0.55rem; flex: 0 0 auto; }
 #meet-roster-paste { min-height: 4rem; max-height: 10rem; resize: vertical; }
 .check { flex-direction: row; align-items: center; gap: 0.5rem; }
 pre { white-space: pre-wrap; background: #0f0d0b; border: 1px solid var(--line); padding: 0.8rem; }
