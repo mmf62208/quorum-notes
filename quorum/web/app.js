@@ -325,6 +325,7 @@ async function openMeeting(id) {
   $("btn-download").setAttribute("download", `${current.file_stem || id}-minutes.md`);
   $("btn-print").href = `/api/meetings/${id}/print.html`;
   await refreshList();
+  syncRecordControls();
   armMic().catch(() => {});
 }
 
@@ -344,6 +345,23 @@ async function saveMeeting() {
   await refreshList();
 }
 
+function hasOpenMeeting() {
+  return Boolean(current?.id);
+}
+
+function syncRecordControls() {
+  const recBtn = $("btn-rec");
+  const stopBtn = $("btn-stop");
+  if (!recBtn || !stopBtn) return;
+  const recording = Boolean(rec.started);
+  recBtn.disabled = recording || !hasOpenMeeting();
+  stopBtn.disabled = !recording;
+  if (!recording) recBtn.classList.remove("hot");
+  if (!hasOpenMeeting() && !recording) {
+    $("meter-label").textContent = "Start meeting first, then Record";
+  }
+}
+
 function setMeter(level) {
   const fill = $("meter-fill");
   const wrap = fill.parentElement;
@@ -352,6 +370,10 @@ function setMeter(level) {
   wrap.className = "meter";
   if (level < 0.04) wrap.classList.add("quiet");
   else if (level > 0.55) wrap.classList.add("hot");
+  if (!rec.started && !hasOpenMeeting()) {
+    $("meter-label").textContent = "Start meeting first, then Record";
+    return;
+  }
   $("meter-label").textContent =
     level < 0.04 ? "Too quiet — move closer or pick another mic" : level > 0.55 ? "Hot / loud" : "Hearing the room";
 }
@@ -494,10 +516,18 @@ async function openMic(recordChunks) {
 
 async function armMic() {
   await openMic(false);
-  $("meter-label").textContent = "Listening — confirm the meter moves before Record";
+  $("meter-label").textContent = hasOpenMeeting()
+    ? "Listening — confirm the meter moves before Record"
+    : "Start meeting first, then Record";
+  syncRecordControls();
 }
 
 async function startRec() {
+  if (!hasOpenMeeting()) {
+    $("meter-label").textContent = "Start meeting first, then Record";
+    syncRecordControls();
+    return;
+  }
   await openMic(true);
   rec.started = Date.now();
   $("btn-rec").disabled = true;
@@ -514,18 +544,32 @@ async function stopRec() {
   cancelAnimationFrame(rec.raf);
   if (rec.ctx) await rec.ctx.close();
   rec = { ctx: null, proc: null, stream: null, chunks: [], started: 0, analyser: null, raf: 0 };
-  $("btn-rec").disabled = false;
   $("btn-rec").classList.remove("hot");
   $("btn-stop").disabled = true;
   $("rec-banner").hidden = true;
-  $("meter-label").textContent = "Saved recording";
-  if (!current?.id) return;
-  const blob = encodeWav(chunks, rate);
-  await fetch(`/api/meetings/${current.id}/audio`, { method: "POST", body: blob });
-  $("player").src = `/api/meetings/${current.id}/audio?t=${Date.now()}`;
-  current.has_audio = true;
-  await saveMeeting();
-  armMic().catch(() => {});
+  if (!chunks.length) {
+    $("meter-label").textContent = "Nothing captured";
+    syncRecordControls();
+    return;
+  }
+  if (!hasOpenMeeting()) {
+    $("meter-label").textContent = "Start meeting first, then Record";
+    syncRecordControls();
+    return;
+  }
+  $("meter-label").textContent = "Saving recording…";
+  try {
+    const blob = encodeWav(chunks, rate);
+    await api(`/api/meetings/${current.id}/audio`, { method: "POST", body: blob });
+    $("player").src = `/api/meetings/${current.id}/audio?t=${Date.now()}`;
+    current.has_audio = true;
+    await saveMeeting();
+    $("meter-label").textContent = "Saved recording";
+    armMic().catch(() => {});
+  } catch (e) {
+    $("meter-label").textContent = e.message || "Could not save recording";
+  }
+  syncRecordControls();
 }
 
 function fileToDataUrl(file) {
@@ -597,6 +641,7 @@ function showBootError(msg) {
 }
 
 async function boot() {
+  syncRecordControls();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
@@ -608,6 +653,7 @@ async function boot() {
     showWizard();
     await refreshList();
     await fillMics().catch(() => {});
+    syncRecordControls();
   } catch (e) {
     showBootError(`Quorum is not talking to this page (${e.message}). Use Start Quorum and stay on http://127.0.0.1:4840, then click Hear the room.`);
     showWizard(true);
@@ -886,6 +932,7 @@ $("btn-delete").onclick = async () => {
   await api(`/api/meetings/${current.id}`, { method: "DELETE" });
   current = null;
   $("console").hidden = true;
+  syncRecordControls();
   await refreshList();
 };
 
