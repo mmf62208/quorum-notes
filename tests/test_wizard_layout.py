@@ -12,7 +12,7 @@ class WizardLayoutTests(unittest.TestCase):
     def test_wizard_ids_and_short_viewport_scroll_css(self):
         html = (WEB / "index.html").read_text(encoding="utf-8")
         css = (WEB / "styles.css").read_text(encoding="utf-8")
-        for needle in ('id="wizard"', 'id="wiz-roster"', 'id="btn-wiz-save"', 'class="sheet"'):
+        for needle in ('id="wizard"', 'id="wiz-roster"', 'id="wiz-roster-confirm"', 'id="btn-wiz-save"', 'class="sheet"'):
             self.assertIn(needle, html)
         self.assertIn("wiz-body", html)
         self.assertIn("wiz-footer", html)
