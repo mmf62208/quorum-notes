@@ -16,6 +16,7 @@ from .naming import meeting_stem
 from .retention import should_delete_audio
 from .templates import opening_for
 from . import settings as app_settings
+from .officers import apply_officer_titles, merge_officer_names, resolve_officers
 from .quorum_rule import apply_result_to_meeting, evaluate_quorum, normalize_quorum_rule, present_people_from
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{4,120}$")
@@ -78,6 +79,8 @@ def _unique_stem(stem: str) -> str:
 def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
     fields = dict(fields or {})
     prefs = app_settings.load_settings()
+    explicit_roster = "roster" in fields
+    explicit_titles = "roster_titles" in fields
     fields.setdefault("organization", prefs.get("organization", ""))
     fields.setdefault("submitted_by", prefs.get("submitted_by", ""))
     fields.setdefault("submitted_office", prefs.get("submitted_office", ""))
@@ -85,6 +88,11 @@ def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
     fields.setdefault("called_to_order_by", prefs.get("called_to_order_by", ""))
     fields.setdefault("roster", list(prefs.get("roster") or []))
     fields.setdefault("roster_titles", dict(prefs.get("roster_titles") or {}))
+    officers = resolve_officers(prefs)
+    if officers and not explicit_roster:
+        fields["roster"] = merge_officer_names(fields.get("roster") or [], officers)
+    if officers and not explicit_titles:
+        fields["roster_titles"] = apply_officer_titles(fields.get("roster_titles") or {}, officers)
     fields.setdefault("roberts", bool(prefs.get("roberts", True)))
     fields.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     if "opening" not in fields:
@@ -153,11 +161,11 @@ def apply_retention(meeting: Meeting) -> bool:
 
 
 def _titles_for(meeting: Meeting, prefs: dict[str, Any] | None = None) -> dict[str, str]:
-    titles: dict[str, str] = {}
     source = prefs if prefs is not None else app_settings.load_settings()
-    titles.update(source.get("roster_titles") or {})
-    titles.update(meeting.roster_titles or {})
-    return titles
+    combined: dict[str, str] = {}
+    combined.update(source.get("roster_titles") or {})
+    combined.update(meeting.roster_titles or {})
+    return apply_officer_titles(combined, resolve_officers(source))
 
 
 def org_quorum_for(meeting: Meeting, prefs: dict[str, Any] | None = None) -> dict[str, Any] | None:

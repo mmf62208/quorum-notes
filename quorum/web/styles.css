@@ -129,6 +129,42 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
 .org-quorum-banner.not_met .org-quorum-title { color: var(--bad); }
 .org-quorum-banner.manual { border-color: var(--gold); }
 #wizard #btn-wiz-save { width: 100%; }
+#officer-sheet.sheet:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
+  padding: 0;
+}
+#officer-sheet .wiz-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+#officer-sheet .wiz-footer {
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 0.75rem 1.25rem max(1.25rem, env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+#officer-sheet #btn-officer-confirm { width: 100%; }
+.officer-list { list-style: none; padding: 0; margin: 0.35rem 0; max-width: 36rem; }
+.officer-list li {
+  display: flex; gap: 0.4rem; align-items: center; margin: 0.3rem 0;
+}
+.officer-list .role {
+  flex: 0 1 10rem; color: var(--muted); font-size: 0.85rem; min-width: 7rem;
+}
+.officer-list input { flex: 1 1 auto; min-width: 8rem; }
+.officer-list .danger { padding: 0.35rem 0.55rem; flex: 0 0 auto; }
 .roster-confirm { list-style: none; padding: 0; margin: 0.35rem 0; max-width: 36rem; }
 .roster-confirm li {
   display: flex; gap: 0.4rem; align-items: center; margin: 0.3rem 0;
