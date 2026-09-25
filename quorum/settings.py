@@ -63,13 +63,29 @@ def _clean_roster_titles(raw: Any) -> dict[str, str]:
     return cleaned
 
 
+def _merge_roster_titles(existing: Any, incoming: Any, roster_names: Any) -> dict[str, str]:
+    cleaned = _clean_roster_titles(incoming)
+    if cleaned:
+        return cleaned
+    names = {" ".join(str(name or "").split()).casefold() for name in (roster_names or [])}
+    kept: dict[str, str] = {}
+    for name, title in (_clean_roster_titles(existing) or {}).items():
+        if name.casefold() in names:
+            kept[name] = title
+    return kept
+
+
 def save_settings(update: dict[str, Any]) -> dict[str, Any]:
     data = load_settings()
     incoming = dict(update or {})
     if "quorum_rule" in incoming:
         incoming["quorum_rule"] = normalize_quorum_rule(incoming.get("quorum_rule")).to_dict()
     if "roster_titles" in incoming:
-        incoming["roster_titles"] = _clean_roster_titles(incoming.get("roster_titles"))
+        incoming["roster_titles"] = _merge_roster_titles(
+            data.get("roster_titles"),
+            incoming.get("roster_titles"),
+            incoming.get("roster") or data.get("roster") or [],
+        )
     data.update(incoming)
     if data.get("retention") not in RETENTION_CHOICES:
         raise ValueError("retention must be until_approved, 7d, 14d, or keep")

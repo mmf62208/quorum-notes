@@ -77,6 +77,19 @@ class QuorumRuleStorageTests(unittest.TestCase):
         raw_path = app_settings.settings_path()
         self.assertFalse(raw_path.is_file())
 
+    def test_empty_title_resave_keeps_existing_titles(self):
+        app_settings.save_settings(
+            {
+                "roster": ["Jeff Shumaker", "Herm Clear"],
+                "roster_titles": {"Jeff Shumaker": "Commander", "Herm Clear": "Chaplain"},
+            }
+        )
+        again = app_settings.save_settings(
+            {"roster": ["Jeff Shumaker", "Herm Clear"], "roster_titles": {}}
+        )
+        self.assertEqual(again["roster_titles"]["Jeff Shumaker"], "Commander")
+        self.assertEqual(again["roster_titles"]["Herm Clear"], "Chaplain")
+
     def test_old_vault_fixture_loads_unchanged(self):
         dest = app_settings.settings_path()
         dest.parent.mkdir(parents=True, exist_ok=True)

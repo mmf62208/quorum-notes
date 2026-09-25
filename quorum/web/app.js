@@ -39,6 +39,35 @@ function confirmedRosterTitles(draft) {
   return titles;
 }
 
+function rosterTextFromSettings() {
+  const names = (settings && settings.roster) || [];
+  const titles = (settings && settings.roster_titles) || {};
+  const lookup = {};
+  Object.entries(titles).forEach(([name, title]) => {
+    lookup[String(name).toLowerCase()] = title;
+  });
+  return names
+    .map((name) => {
+      const title = lookup[String(name).toLowerCase()] || "";
+      return title ? `${title}: ${name}` : name;
+    })
+    .join("\n");
+}
+
+function applyStoredRosterTitles(draft) {
+  const titles = (settings && settings.roster_titles) || {};
+  const lookup = {};
+  Object.entries(titles).forEach(([name, title]) => {
+    lookup[String(name).toLowerCase()] = title;
+  });
+  (draft || []).forEach((row) => {
+    if (!row || row.title) return;
+    const found = lookup[String(row.name || "").toLowerCase()];
+    if (found) row.title = found;
+  });
+  return draft;
+}
+
 const SAL_484_TITLES = ["Commander", "1st Vice Commander", "2nd Vice Commander"];
 const SAL_484_NOTES = "SAL Post 484: Commander or presiding 1st/2nd Vice + at least 3 other officers";
 let wizQuorumExtraTitles = [];
@@ -288,6 +317,7 @@ async function refreshWizardRosterDraft(text) {
     title: entry.title || "",
     raw: entry.raw || "",
   }));
+  applyStoredRosterTitles(wizRosterDraft);
   renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
   showRosterFlags("wiz-roster-flags", parsed.skipped);
   refreshQuorumTitleChoices();
@@ -1001,7 +1031,7 @@ function showWizard(force = false) {
   $("wiz-template").value = settings.template || "sal";
   $("wiz-retention").value = settings.retention || "until_approved";
   $("wiz-roberts").checked = settings.roberts !== false;
-  $("wiz-roster").value = (settings.roster || []).join("\n");
+  $("wiz-roster").value = rosterTextFromSettings();
   fillWizardQuorum(settings.quorum_rule);
   $("wizard").hidden = false;
   refreshWizardRosterDraft($("wiz-roster").value).catch(() => {
@@ -1010,6 +1040,7 @@ function showWizard(force = false) {
       title: (settings.roster_titles && settings.roster_titles[name]) || "",
       raw: name,
     }));
+    applyStoredRosterTitles(wizRosterDraft);
     renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
     refreshQuorumTitleChoices();
   });
