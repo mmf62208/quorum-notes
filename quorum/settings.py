@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import vault_dir
+from .officers import normalize_officers, officers_to_dicts
 from .quorum_rule import normalize_quorum_rule
 
 DEFAULTS: dict[str, Any] = {
@@ -48,6 +49,8 @@ def load_settings() -> dict[str, Any]:
         data["quorum_rule"] = normalize_quorum_rule(data.get("quorum_rule")).to_dict()
     if "roster_titles" in data:
         data["roster_titles"] = _clean_roster_titles(data.get("roster_titles"))
+    if "officers" in data:
+        data["officers"] = officers_to_dicts(normalize_officers(data.get("officers")))
     return data
 
 
@@ -86,6 +89,8 @@ def save_settings(update: dict[str, Any]) -> dict[str, Any]:
             incoming.get("roster_titles"),
             incoming.get("roster") or data.get("roster") or [],
         )
+    if "officers" in incoming:
+        incoming["officers"] = officers_to_dicts(normalize_officers(incoming.get("officers")))
     data.update(incoming)
     if data.get("retention") not in RETENTION_CHOICES:
         raise ValueError("retention must be until_approved, 7d, 14d, or keep")

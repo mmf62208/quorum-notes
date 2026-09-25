@@ -68,6 +68,56 @@ function applyStoredRosterTitles(draft) {
   return draft;
 }
 
+function rememberedOfficersFromSettings() {
+  if (settings && Object.prototype.hasOwnProperty.call(settings, "officers")) {
+    return (settings.officers || [])
+      .map((row) => ({
+        role: String((row && row.role) || "").replace(/\s+/g, " ").trim(),
+        name: String((row && row.name) || "").replace(/\s+/g, " ").trim(),
+      }))
+      .filter((row) => row.role);
+  }
+  const titles = (settings && settings.roster_titles) || {};
+  const officers = [];
+  const seen = new Set();
+  Object.entries(titles).forEach(([name, title]) => {
+    const role = String(title || "").replace(/\s+/g, " ").trim();
+    const person = String(name || "").replace(/\s+/g, " ").trim();
+    if (!role || !person || role.toLowerCase() === "member") return;
+    const key = role.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    officers.push({ role, name: person });
+  });
+  return officers;
+}
+
+function shouldAskOfficers() {
+  if (settings && Object.prototype.hasOwnProperty.call(settings, "officers")) return true;
+  return rememberedOfficersFromSettings().length > 0;
+}
+
+function titleLookup() {
+  const officers = rememberedOfficersFromSettings();
+  const managed = new Set(officers.map((row) => row.role.toLowerCase()));
+  const lookup = {};
+  const add = (name, title, skipManaged) => {
+    const person = String(name || "").replace(/\s+/g, " ").trim();
+    const role = String(title || "").replace(/\s+/g, " ").trim();
+    if (!person || !role) return;
+    if (skipManaged && managed.has(role.toLowerCase())) return;
+    lookup[person.toLowerCase()] = role;
+  };
+  Object.entries((settings && settings.roster_titles) || {}).forEach(([name, title]) => add(name, title, true));
+  Object.entries((current && current.roster_titles) || {}).forEach(([name, title]) => add(name, title, true));
+  officers.forEach((row) => add(row.name, row.role, false));
+  return lookup;
+}
+
+function titleForName(name) {
+  return titleLookup()[String(name || "").toLowerCase()] || "";
+}
+
 const SAL_484_TITLES = ["Commander", "1st Vice Commander", "2nd Vice Commander"];
 const SAL_484_NOTES = "SAL Post 484: Commander or presiding 1st/2nd Vice + at least 3 other officers";
 let wizQuorumExtraTitles = [];
@@ -159,6 +209,7 @@ function rosterTitleChoices() {
     seen.add(key);
     titles.push(title);
   };
+  rememberedOfficersFromSettings().forEach((row) => add(row.role));
   (wizRosterDraft || []).forEach((row) => add(row.title));
   Object.values((settings && settings.roster_titles) || {}).forEach(add);
   ((settings.quorum_rule && settings.quorum_rule.presiding_any_of) || []).forEach(add);
@@ -309,6 +360,93 @@ async function parseRosterText(text) {
 
 let wizRosterDraft = [];
 let meetRosterDraft = [];
+let officerDraft = [];
+
+function showOfficerSheet() {
+  const sheet = $("officer-sheet");
+  if (!sheet) return;
+  renderOfficerDraft();
+  sheet.hidden = false;
+}
+
+function hideOfficerSheet() {
+  const sheet = $("officer-sheet");
+  if (sheet) sheet.hidden = true;
+}
+
+function renderOfficerDraft() {
+  const list = $("officer-list");
+  if (!list) return;
+  list.innerHTML = "";
+  (officerDraft || []).forEach((row, index) => {
+    const li = document.createElement("li");
+    const role = document.createElement("span");
+    role.className = "role";
+    role.textContent = row.role || "";
+    const input = document.createElement("input");
+    input.value = row.name || "";
+    input.setAttribute("aria-label", `${row.role || "Officer"} name`);
+    input.placeholder = "Name";
+    input.oninput = () => {
+      officerDraft[index].name = input.value;
+      persistOfficerDraft();
+    };
+    const vacate = document.createElement("button");
+    vacate.type = "button";
+    vacate.className = "danger";
+    vacate.textContent = "Vacate";
+    vacate.onclick = async () => {
+      officerDraft[index].name = "";
+      renderOfficerDraft();
+      try {
+        await saveOfficerDraft();
+      } catch (e) {
+        if ($("officer-error")) $("officer-error").textContent = e.message || "Could not save officers";
+      }
+    };
+    li.appendChild(role);
+    li.appendChild(input);
+    li.appendChild(vacate);
+    list.appendChild(li);
+  });
+}
+
+const persistOfficerDraft = debounce(() => {
+  saveOfficerDraft().catch((e) => {
+    if ($("officer-error")) $("officer-error").textContent = e.message || "Could not save officers";
+  });
+}, 200);
+
+async function saveOfficerDraft() {
+  const officers = (officerDraft || [])
+    .map((row) => ({
+      role: String((row && row.role) || "").replace(/\s+/g, " ").trim(),
+      name: String((row && row.name) || "").replace(/\s+/g, " ").trim(),
+    }))
+    .filter((row) => row.role);
+  const data = await api("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ officers }),
+  });
+  settings = data.settings || settings;
+  refreshQuorumTitleChoices();
+  if (current) renderPeople();
+  return officers;
+}
+
+async function confirmOfficersAndStart() {
+  const err = $("officer-error");
+  if (err) err.textContent = "";
+  await saveOfficerDraft();
+  const data = await api("/api/meetings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Regular Meeting" }),
+  });
+  hideOfficerSheet();
+  await openMeeting(data.meeting.id);
+}
 
 async function refreshWizardRosterDraft(text) {
   const parsed = await parseRosterText(text);
@@ -465,7 +603,8 @@ function renderPeople() {
   names.forEach((name) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = name;
+    const title = titleForName(name);
+    b.textContent = title ? `${title}: ${name}` : name;
     if ((current.present || []).includes(name)) b.classList.add("present");
     if ((current.late || []).includes(name)) b.classList.add("late");
     const last = (current.speaker_marks || []).at(-1);
@@ -1164,6 +1303,11 @@ $("btn-demo").onclick = async () => {
 };
 $("btn-new").onclick = async () => {
   try {
+    if (shouldAskOfficers()) {
+      officerDraft = rememberedOfficersFromSettings().map((row) => ({ role: row.role, name: row.name }));
+      showOfficerSheet();
+      return;
+    }
     const data = await api("/api/meetings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1174,6 +1318,33 @@ $("btn-new").onclick = async () => {
     showBootError(e.message || "Could not start meeting");
   }
 };
+if ($("btn-officer-confirm")) {
+  $("btn-officer-confirm").onclick = () => {
+    confirmOfficersAndStart().catch((e) => {
+      if ($("officer-error")) $("officer-error").textContent = e.message || "Could not start meeting";
+      else showBootError(e.message || "Could not start meeting");
+    });
+  };
+}
+if ($("btn-officer-add")) {
+  $("btn-officer-add").onclick = async () => {
+    const role = ($("officer-add-role") && $("officer-add-role").value || "").replace(/\s+/g, " ").trim();
+    const name = ($("officer-add-name") && $("officer-add-name").value || "").replace(/\s+/g, " ").trim();
+    if (!role) return;
+    const key = role.toLowerCase();
+    const existing = officerDraft.find((row) => String(row.role || "").toLowerCase() === key);
+    if (existing) existing.name = name;
+    else officerDraft.push({ role, name });
+    if ($("officer-add-role")) $("officer-add-role").value = "";
+    if ($("officer-add-name")) $("officer-add-name").value = "";
+    renderOfficerDraft();
+    try {
+      await saveOfficerDraft();
+    } catch (e) {
+      if ($("officer-error")) $("officer-error").textContent = e.message || "Could not save officers";
+    }
+  };
+}
 $("btn-save").onclick = () => saveMeeting().catch((e) => { $("save-status").textContent = e.message; });
 $("btn-rec").onclick = () => startRec().catch((e) => {
   const msg = String(e.message || e);

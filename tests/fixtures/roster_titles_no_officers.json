@@ -1,0 +1,21 @@
+{
+  "setup_complete": true,
+  "organization": "SAL Post 484 Squadron",
+  "submitted_by": "Mike Featherstone",
+  "submitted_office": "Adjutant",
+  "template": "sal",
+  "roberts": true,
+  "retention": "until_approved",
+  "default_location": "Post home",
+  "called_to_order_by": "Commander",
+  "roster": [
+    "Jeff Shumaker",
+    "Herm Clear",
+    "Mike Featherstone"
+  ],
+  "roster_titles": {
+    "Jeff Shumaker": "Commander",
+    "Herm Clear": "Chaplain",
+    "Mike Featherstone": "Adjutant"
+  }
+}

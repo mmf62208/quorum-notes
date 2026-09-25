@@ -37,7 +37,7 @@
       <label>Usual roster (paste names, titles, or CSV)
         <textarea id="wiz-roster" rows="8" placeholder="Commander: Jane Doe&#10;Name, Title&#10;or one name per line"></textarea>
       </label>
-      <p class="hint">Review the list, then Save. Titles help parse names; they are not stored as officer memory.</p>
+      <p class="hint">Review the list, then Save. Titles seed officer memory for the next meeting.</p>
       <ul id="wiz-roster-confirm" class="roster-confirm"></ul>
       <p class="hint" id="wiz-roster-flags"></p>
       <div class="row compact">
@@ -75,6 +75,23 @@
     </div>
     <div class="wiz-footer">
       <button type="button" class="primary big" id="btn-wiz-save">Save and start</button>
+    </div>
+  </section>
+
+  <section id="officer-sheet" class="sheet" hidden>
+    <div class="wiz-body">
+      <h1>Same officers as last time?</h1>
+      <p class="hint">One tap Confirm carries them into this meeting. They are not marked present. Swap a name, vacate a role, or add a role if something changed.</p>
+      <ul id="officer-list" class="officer-list"></ul>
+      <div class="row compact">
+        <input id="officer-add-role" placeholder="Add a role" />
+        <input id="officer-add-name" placeholder="Name (optional)" />
+        <button type="button" id="btn-officer-add">Add a role</button>
+      </div>
+      <p class="hint" id="officer-error"></p>
+    </div>
+    <div class="wiz-footer">
+      <button type="button" class="primary big" id="btn-officer-confirm">Confirm</button>
     </div>
   </section>
 

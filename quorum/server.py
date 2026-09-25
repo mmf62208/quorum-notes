@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from . import ai, backup, config, demo, roster, settings as app_settings, signin, vault
 from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
+from .officers import apply_officer_titles, resolve_officers
 from .quorum_rule import evaluate_quorum, normalize_quorum_rule, present_people_from
 
 
@@ -163,9 +164,10 @@ class Handler(BaseHTTPRequestHandler):
                 body = _read_json(self) or {}
                 prefs = app_settings.load_settings()
                 rule = normalize_quorum_rule(body.get("quorum_rule", prefs.get("quorum_rule")))
-                titles: dict[str, str] = {}
-                titles.update(prefs.get("roster_titles") or {})
-                titles.update(body.get("roster_titles") or {})
+                combined: dict[str, str] = {}
+                combined.update(prefs.get("roster_titles") or {})
+                combined.update(body.get("roster_titles") or {})
+                titles = apply_officer_titles(combined, resolve_officers(prefs))
                 raw_people = body.get("present_people")
                 if raw_people:
                     people = present_people_from(raw_people, titles)
