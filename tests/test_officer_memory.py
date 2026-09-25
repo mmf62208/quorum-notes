@@ -278,6 +278,7 @@ class OfficerUiContractTests(unittest.TestCase):
         self.assertIn("confirmOfficersAndStart", APP_JS)
         confirm_at = APP_JS.index("async function confirmOfficersAndStart")
         chunk = APP_JS[confirm_at : confirm_at + 700]
+        self.assertIn("takePendingOfficerAdd", chunk)
         self.assertIn("/api/meetings", chunk)
         self.assertNotIn("present:", chunk)
         self.assertIn("titleForName", APP_JS)

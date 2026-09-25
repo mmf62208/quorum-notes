@@ -435,9 +435,23 @@ async function saveOfficerDraft() {
   return officers;
 }
 
+function takePendingOfficerAdd() {
+  const role = ($("officer-add-role") && $("officer-add-role").value || "").replace(/\s+/g, " ").trim();
+  const name = ($("officer-add-name") && $("officer-add-name").value || "").replace(/\s+/g, " ").trim();
+  if (!role) return false;
+  const key = role.toLowerCase();
+  const existing = officerDraft.find((row) => String(row.role || "").toLowerCase() === key);
+  if (existing) existing.name = name;
+  else officerDraft.push({ role, name });
+  if ($("officer-add-role")) $("officer-add-role").value = "";
+  if ($("officer-add-name")) $("officer-add-name").value = "";
+  return true;
+}
+
 async function confirmOfficersAndStart() {
   const err = $("officer-error");
   if (err) err.textContent = "";
+  takePendingOfficerAdd();
   await saveOfficerDraft();
   const data = await api("/api/meetings", {
     method: "POST",
@@ -1328,15 +1342,7 @@ if ($("btn-officer-confirm")) {
 }
 if ($("btn-officer-add")) {
   $("btn-officer-add").onclick = async () => {
-    const role = ($("officer-add-role") && $("officer-add-role").value || "").replace(/\s+/g, " ").trim();
-    const name = ($("officer-add-name") && $("officer-add-name").value || "").replace(/\s+/g, " ").trim();
-    if (!role) return;
-    const key = role.toLowerCase();
-    const existing = officerDraft.find((row) => String(row.role || "").toLowerCase() === key);
-    if (existing) existing.name = name;
-    else officerDraft.push({ role, name });
-    if ($("officer-add-role")) $("officer-add-role").value = "";
-    if ($("officer-add-name")) $("officer-add-name").value = "";
+    if (!takePendingOfficerAdd()) return;
     renderOfficerDraft();
     try {
       await saveOfficerDraft();
