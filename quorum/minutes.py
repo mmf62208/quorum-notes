@@ -5,6 +5,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .name_style import NameStyle, names_from_meeting, style_for_names
+from .quorum_rule import is_officer_title
+from .roster import display_title
+from .signin import normalize_name
+
+SAL_POST_484_CLOSING = "For God and Country"
+
 
 @dataclass
 class Motion:
@@ -120,6 +127,7 @@ class Meeting:
     submitted_by: str = ""
     submitted_office: str = "Adjutant"
     closing: str = ""
+    minutes_closing: str = ""
     notes: str = ""
     late: list[str] = field(default_factory=list)
     guests: list[str] = field(default_factory=list)
@@ -196,9 +204,140 @@ class Meeting:
         return cls(**{k: v for k, v in payload.items() if k in known})
 
 
+def _bullet(text: str) -> str:
+    item = " ".join((text or "").split()).strip()
+    if item.startswith(("* ", "- ")):
+        item = item[2:].strip()
+    return f"* {item}"
+
+
+def _looks_like_list_line(text: str) -> bool:
+    stripped = (text or "").strip()
+    if stripped.startswith(("* ", "- ", "*\t", "-\t")):
+        return True
+    if stripped[:1].isdigit() and ". " in stripped[:4]:
+        return True
+    return False
+
+
+def _is_listish(text: str) -> bool:
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    if len(lines) <= 1:
+        return False
+    return all(_looks_like_list_line(ln) for ln in lines)
+
+
+def _run_in(header: str, body: str) -> list[str]:
+    """Bold header on the same line as a single-block body; list bodies stay stacked."""
+    text = (body or "").strip()
+    if not text:
+        return [f"**{header}:**"]
+    if "\n" in text or _is_listish(text):
+        out = [f"**{header}:**"]
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            out.append(_bullet(stripped) if _looks_like_list_line(stripped) else stripped)
+        return out
+    return [f"**{header}:** {text}"]
+
+
+def _title_for(meeting: Meeting, name: str) -> str:
+    titles = meeting.roster_titles or {}
+    if name in titles:
+        return display_title(titles[name]) or titles[name]
+    key = normalize_name(name)
+    for raw, title in titles.items():
+        if normalize_name(raw) == key:
+            return display_title(title) or title
+    return ""
+
+
+def _officer_entries(meeting: Meeting) -> list[tuple[str, str]]:
+    entries: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for name in meeting.roster or []:
+        title = _title_for(meeting, name)
+        if not name or not title or not is_officer_title(title):
+            continue
+        seen.add(normalize_name(name))
+        entries.append((name, title))
+    for name, raw_title in (meeting.roster_titles or {}).items():
+        title = display_title(raw_title) or raw_title
+        if not name or not title or not is_officer_title(title):
+            continue
+        key = normalize_name(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append((name, title))
+    return entries
+
+
+def _attendance_status(meeting: Meeting, name: str) -> str:
+    key = normalize_name(name)
+    if key in {normalize_name(n) for n in (meeting.present or []) if n}:
+        return "present"
+    if key in {normalize_name(n) for n in (meeting.late or []) if n}:
+        return "late"
+    return "absent"
+
+
+def _other_present(meeting: Meeting, officer_keys: set[str]) -> list[str]:
+    others: list[str] = []
+    seen: set[str] = set()
+    for name in list(meeting.present or []) + list(meeting.late or []) + list(meeting.guests or []):
+        if not name:
+            continue
+        key = normalize_name(name)
+        if key in officer_keys or key in seen:
+            continue
+        seen.add(key)
+        others.append(name)
+    return others
+
+
+def _motion_clause(text: str) -> str:
+    cleaned = (text or "").strip().rstrip(".")
+    if not cleaned:
+        return "moved"
+    low = cleaned.casefold()
+    if low.startswith(("to ", "that ")):
+        return f"moved {cleaned}"
+    return f"moved to {cleaned}"
+
+
+def _format_motion(motion: Motion, style: NameStyle) -> str:
+    who = style.spoken(motion.mover) or "A member"
+    line = f"{who} {_motion_clause(motion.text)}"
+    if (motion.seconder or "").strip():
+        line += f"; {style.spoken(motion.seconder)} seconded"
+    line += "."
+    result = (motion.result or "").strip()
+    if result and result != "pending":
+        line += f" Motion {result}."
+    if motion.yeas or motion.nays or motion.abstain:
+        line += f" (Yea {motion.yeas}, Nay {motion.nays}, Abstain {motion.abstain})"
+    return line
+
+
+def _signature_office(meeting: Meeting) -> str:
+    office = (meeting.submitted_office or "").strip() or "Adjutant"
+    org = (meeting.organization or "").strip()
+    if org and "," not in office:
+        return f"{office}, {org}"
+    return office
+
+
+def _closing_line(meeting: Meeting) -> str:
+    return ((meeting.minutes_closing or meeting.closing or "").strip())
+
+
 def render_minutes(meeting: Meeting) -> str:
-    """Render formal minutes in the SAL / civic style used by the adjutant."""
+    """Render formal minutes in the SAL / civic house style used by the adjutant."""
     rc = meeting.roll_call()
+    style = style_for_names(names_from_meeting(meeting))
     lines: list[str] = []
     org = meeting.organization or "Organization"
     lines.append(f"**{org} Meeting Minutes**")
@@ -214,35 +353,59 @@ def render_minutes(meeting: Meeting) -> str:
         lines.append("")
     if meeting.opening:
         lines.append("**Opening Ceremonies:**")
-        lines.append("")
         for item in meeting.opening:
-            lines.append(f"* {item}")
+            lines.append(_bullet(item))
         lines.append("")
-    lines.append("**Roll Call / Quorum:**")
-    if meeting.present:
-        lines.append("Members present included:")
-        lines.append("")
-        lines.append(", ".join(meeting.present) + ".")
-        lines.append("")
-    if meeting.late:
-        lines.append("Arrived late: " + ", ".join(meeting.late) + ".")
-        lines.append("")
-    if meeting.guests:
-        lines.append("Guests: " + ", ".join(meeting.guests) + ".")
-        lines.append("")
+    if meeting.called_to_order_by:
+        lines.append(f"**Roll Call / Quorum:** {meeting.called_to_order_by} conducted roll call.")
+    else:
+        lines.append("**Roll Call / Quorum:** Roll was called.")
+    officers = _officer_entries(meeting)
+    officer_keys = {normalize_name(name) for name, _title in officers}
+    if officers:
+        lines.append("**Officers:**")
+        for name, title in officers:
+            labeled = f"{title} {style.roll(name)}".strip()
+            lines.append(f"* {labeled}, {_attendance_status(meeting, name)}")
+        others = _other_present(meeting, officer_keys)
+        if others:
+            lines.append("")
+            guest_names = ", ".join(style.roll(name) for name in others)
+            lines.append(f"**Members / guests also present:** {guest_names}.")
+    else:
+        if meeting.present:
+            lines.append("Members present included:")
+            lines.append("")
+            lines.append(", ".join(style.roll(name) for name in meeting.present) + ".")
+            lines.append("")
+        if meeting.late:
+            lines.append("Arrived late: " + ", ".join(style.roll(name) for name in meeting.late) + ".")
+            lines.append("")
+        if meeting.guests:
+            lines.append("Guests: " + ", ".join(style.roll(name) for name in meeting.guests) + ".")
+            lines.append("")
+        if rc["absent"]:
+            lines.append("Members absent: " + ", ".join(style.roll(name) for name in rc["absent"]) + ".")
+            lines.append("")
     if meeting.org_quorum_line:
+        if lines and lines[-1] != "":
+            lines.append("")
         lines.append(meeting.org_quorum_line)
     elif rc["quorum"]:
+        if lines and lines[-1] != "":
+            lines.append("")
         lines.append(
             f"A quorum was present ({rc['present_count']} present; {rc['required']} required)."
         )
     else:
+        if lines and lines[-1] != "":
+            lines.append("")
         lines.append(
             f"A quorum was **not** present ({rc['present_count']} present; {rc['required']} required)."
         )
-    if rc["absent"]:
+    if officers and rc["absent"] and not any(_title_for(meeting, name) and is_officer_title(_title_for(meeting, name)) for name in rc["absent"]):
         lines.append("")
-        lines.append("Members absent: " + ", ".join(rc["absent"]) + ".")
+        lines.append("Members absent: " + ", ".join(style.roll(name) for name in rc["absent"]) + ".")
     lines.append("")
     prev_map = {
         "approved": "The minutes of the previous meeting were approved as printed.",
@@ -250,7 +413,10 @@ def render_minutes(meeting: Meeting) -> str:
         "not_read": "Reading of the previous minutes was dispensed with.",
         "pending": "Approval of the previous minutes is pending.",
     }
-    lines.append("**Approval of Previous Minutes:** " + prev_map.get(meeting.previous_minutes, meeting.previous_minutes))
+    lines.append(
+        "**Approval of Previous Minutes:** "
+        + prev_map.get(meeting.previous_minutes, meeting.previous_minutes)
+    )
     if meeting.previous_minutes_note:
         lines.append(meeting.previous_minutes_note)
     lines.append("")
@@ -258,65 +424,53 @@ def render_minutes(meeting: Meeting) -> str:
         lines.append("**Reports:**")
         lines.append("")
         for report in meeting.reports:
-            head = f"**{report.title}**"
+            head = report.title
             if report.presenter:
-                head += f" ({report.presenter})"
-            lines.append(head)
-            if report.body:
-                lines.append(report.body)
+                spoken = style.spoken(report.presenter)
+                head = f"{report.title} ({spoken})" if spoken else report.title
+            lines.extend(_run_in(head, report.body))
             lines.append("")
     if meeting.old_business:
         lines.append("**Old Business:**")
-        lines.append("")
         for item in meeting.old_business:
-            lines.append(f"* {item}")
+            lines.append(_bullet(item))
         lines.append("")
     if meeting.new_business:
         lines.append("**New Business:**")
-        lines.append("")
         for i, motion in enumerate(meeting.new_business, 1):
-            who = motion.mover or "A member"
-            line = f"{i}. {who} moved that {motion.text.rstrip('.')}"
-            if motion.seconder:
-                line += f"; {motion.seconder} seconded"
-            line += f". The motion {motion.result}."
-            if motion.yeas or motion.nays or motion.abstain:
-                line += f" (Yea {motion.yeas}, Nay {motion.nays}, Abstain {motion.abstain})"
-            lines.append(line)
+            lines.append(f"{i}. {_format_motion(motion, style)}")
         lines.append("")
     if meeting.announcements:
         lines.append("**Announcements / Good of the Order:**")
-        lines.append("")
         for item in meeting.announcements:
-            lines.append(f"* {item}")
+            lines.append(_bullet(item))
         lines.append("")
     if meeting.adjournment:
         lines.append(f"**Adjournment:** {meeting.adjournment}")
         lines.append("")
-    if meeting.closing:
-        lines.append(meeting.closing)
-        lines.append("")
     if meeting.takeaways:
         lines.append("**Takeaways / assignments:**")
-        lines.append("")
         for item in meeting.takeaways:
-            who = f" — {item.owner}" if item.owner else ""
-            lines.append(f"* {item.text}{who}")
+            extra = f" ({item.owner})" if item.owner else ""
+            lines.append(f"* {item.text}{extra}")
         lines.append("")
     if meeting.speaker_marks:
         lines.append("**Speaker marks (for review):**")
-        lines.append("")
         for mark in meeting.speaker_marks:
             mins = int(mark.seconds) // 60
             secs = int(mark.seconds) % 60
-            lines.append(f"* {mins:02d}:{secs:02d} — {mark.name}")
+            lines.append(f"* {mins:02d}:{secs:02d} {mark.name}")
         lines.append("")
     if meeting.submitted_by:
         lines.append("**Respectfully submitted,**")
         lines.append("")
         lines.append(f"**{meeting.submitted_by}**")
-        if meeting.submitted_office:
-            lines.append(f"**{meeting.submitted_office}**")
+        lines.append("")
+        lines.append(f"**{_signature_office(meeting)}**")
+        closing = _closing_line(meeting)
+        if closing:
+            lines.append("")
+            lines.append(f"**{closing}**")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

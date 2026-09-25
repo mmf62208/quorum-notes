@@ -94,6 +94,7 @@ def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
     if officers and not explicit_titles:
         fields["roster_titles"] = apply_officer_titles(fields.get("roster_titles") or {}, officers)
     fields.setdefault("roberts", bool(prefs.get("roberts", True)))
+    fields.setdefault("minutes_closing", str(prefs.get("minutes_closing") or ""))
     fields.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     if "opening" not in fields:
         fields["opening"] = opening_for(str(prefs.get("template") or "sal"))
@@ -180,6 +181,8 @@ def save_meeting(meeting: Meeting) -> Meeting:
     enforce_motion_rules(meeting)
     meeting.agenda_index = clamp_agenda_index(int(meeting.agenda_index or 0))
     prefs = app_settings.load_settings()
+    if "minutes_closing" in prefs:
+        meeting.minutes_closing = " ".join(str(prefs.get("minutes_closing") or "").split())
     rule = normalize_quorum_rule(prefs.get("quorum_rule"))
     result = evaluate_quorum(rule, present_people_from(meeting.present, _titles_for(meeting, prefs)))
     apply_result_to_meeting(meeting, result)

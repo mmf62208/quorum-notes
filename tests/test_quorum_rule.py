@@ -292,7 +292,7 @@ class QuorumMinutesLineTests(unittest.TestCase):
         self.assertEqual(text.count("Quorum: Not met (need 1 more officer)."), 1)
         self.assertNotIn("A quorum was present", text)
         self.assertNotIn("A quorum was **not** present", text)
-        self.assertLess(text.index("Members present"), text.index("Quorum: Not met"))
+        self.assertLess(text.index("**Roll Call / Quorum:**"), text.index("Quorum: Not met"))
         self.assertLess(text.index("Quorum: Not met"), text.index("**Approval of Previous Minutes:**"))
 
     def test_no_rule_gives_only_old_line(self):
@@ -319,7 +319,7 @@ class QuorumMinutesLineTests(unittest.TestCase):
         self.assertEqual(third.count("Quorum: Met (Commander presiding; 3 other officers present)."), 1)
         self.assertNotIn("Quorum: Not met", third)
         self.assertNotIn("A quorum was present", third)
-        self.assertLess(third.index("Members present"), third.index("Quorum: Met"))
+        self.assertLess(third.index("**Roll Call / Quorum:**"), third.index("Quorum: Met"))
 
     def test_hand_edit_is_not_clobbered(self):
         meeting = self._meeting(

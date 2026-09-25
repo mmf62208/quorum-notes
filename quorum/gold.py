@@ -7,7 +7,7 @@ REQUIRED_SAL_PHRASES = (
     "Roll Call / Quorum",
     "Approval of Previous Minutes",
     "New Business",
-    "moved that",
+    "moved",
     "seconded",
     "Respectfully submitted",
 )

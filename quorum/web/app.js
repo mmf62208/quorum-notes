@@ -120,6 +120,7 @@ function titleForName(name) {
 
 const SAL_484_TITLES = ["Commander", "1st Vice Commander", "2nd Vice Commander"];
 const SAL_484_NOTES = "SAL Post 484: Commander or presiding 1st/2nd Vice + at least 3 other officers";
+const SAL_484_CLOSING = "For God and Country";
 let wizQuorumExtraTitles = [];
 let lastOrgQuorum = null;
 let orgQuorumDismissedKey = "";
@@ -268,6 +269,10 @@ function fillWizardQuorum(rule) {
     el.checked = wanted.has(el.value.toLowerCase());
   });
   updateQuorumPreview();
+}
+
+function applySal484Closing() {
+  if ($("wiz-minutes-closing")) $("wiz-minutes-closing").value = SAL_484_CLOSING;
 }
 
 function applySal484Example() {
@@ -1186,6 +1191,7 @@ function showWizard(force = false) {
   $("wiz-roberts").checked = settings.roberts !== false;
   $("wiz-roster").value = rosterTextFromSettings();
   fillWizardQuorum(settings.quorum_rule);
+  if ($("wiz-minutes-closing")) $("wiz-minutes-closing").value = settings.minutes_closing || "";
   $("wizard").hidden = false;
   refreshWizardRosterDraft($("wiz-roster").value).catch(() => {
     wizRosterDraft = (settings.roster || []).map((name) => ({
@@ -1248,6 +1254,7 @@ $("btn-wiz-save").onclick = async () => {
         roster: confirmedRosterNames(wizRosterDraft),
         roster_titles: confirmedRosterTitles(wizRosterDraft),
         quorum_rule: readWizardQuorumRule(),
+        minutes_closing: ($("wiz-minutes-closing") && $("wiz-minutes-closing").value.trim()) || "",
       }),
     }).then((d) => d.settings);
     $("wizard").hidden = true;
@@ -1295,6 +1302,7 @@ if ($("btn-wiz-quorum-add-title")) {
   };
 }
 if ($("btn-wiz-quorum-sal")) $("btn-wiz-quorum-sal").onclick = applySal484Example;
+if ($("btn-wiz-closing-sal")) $("btn-wiz-closing-sal").onclick = applySal484Closing;
 ["wiz-quorum-min-officers", "wiz-quorum-min-members", "wiz-quorum-struct-notes", "wiz-quorum-text"].forEach((id) => {
   const el = $(id);
   if (el) el.addEventListener("input", updateQuorumPreview);

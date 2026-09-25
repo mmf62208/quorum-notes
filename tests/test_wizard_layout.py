@@ -30,5 +30,7 @@ class WizardLayoutTests(unittest.TestCase):
             "Save must stay after the roster so Tab order is unchanged",
         )
         self.assertLess(html.index('id="wiz-roster-confirm"'), html.index('id="wiz-quorum"'))
-        self.assertLess(html.index('id="wiz-quorum"'), html.index('id="btn-wiz-save"'))
+        self.assertLess(html.index('id="wiz-quorum"'), html.index('id="wiz-minutes-closing"'))
+        self.assertLess(html.index('id="wiz-minutes-closing"'), html.index('id="btn-wiz-save"'))
         self.assertIn("Any special quorum rule?", html)
+        self.assertIn("Minutes closing line", html)
