@@ -21,6 +21,10 @@ QUORUM_MINUTES_LINE_RE = re.compile(
     r"^[ \t]*(?:Quorum: (?:Met|Not met)\b.*|Quorum rule: .*\(Checked manually\.\))[ \t]*$",
     re.M,
 )
+OLD_MAJORITY_QUORUM_RE = re.compile(
+    r"^[ \t]*A quorum was(?: \*\*not\*\*)? present \(\d+ present; \d+ required\)\.[ \t]*$",
+    re.M,
+)
 PREVIOUS_MINUTES_MARK = "**Approval of Previous Minutes:**"
 
 
@@ -346,6 +350,8 @@ def evaluate_quorum(rule: Any, present_people: Iterable[Any]) -> QuorumResult | 
 def upsert_quorum_minutes_line(text: str, line: str | None) -> str:
     """Put one generated quorum line after attendance; never duplicate."""
     body = QUORUM_MINUTES_LINE_RE.sub("", text or "")
+    if (line or "").strip():
+        body = OLD_MAJORITY_QUORUM_RE.sub("", body)
     body = re.sub(r"\n{3,}", "\n\n", body)
     if not (line or "").strip():
         return body if body.endswith("\n") else body + "\n"

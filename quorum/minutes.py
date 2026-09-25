@@ -230,7 +230,9 @@ def render_minutes(meeting: Meeting) -> str:
     if meeting.guests:
         lines.append("Guests: " + ", ".join(meeting.guests) + ".")
         lines.append("")
-    if rc["quorum"]:
+    if meeting.org_quorum_line:
+        lines.append(meeting.org_quorum_line)
+    elif rc["quorum"]:
         lines.append(
             f"A quorum was present ({rc['present_count']} present; {rc['required']} required)."
         )
@@ -241,9 +243,6 @@ def render_minutes(meeting: Meeting) -> str:
     if rc["absent"]:
         lines.append("")
         lines.append("Members absent: " + ", ".join(rc["absent"]) + ".")
-    if meeting.org_quorum_line:
-        lines.append("")
-        lines.append(meeting.org_quorum_line)
     lines.append("")
     prev_map = {
         "approved": "The minutes of the previous meeting were approved as printed.",

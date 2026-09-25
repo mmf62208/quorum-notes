@@ -286,12 +286,30 @@ class QuorumMinutesLineTests(unittest.TestCase):
         base.update(fields)
         return Meeting(**base)
 
-    def test_line_inserted_once_after_attendance(self):
+    def test_rule_set_gives_only_b2_line(self):
         meeting = self._meeting(org_quorum_line="Quorum: Not met (need 1 more officer).")
         text = render_minutes(meeting)
         self.assertEqual(text.count("Quorum: Not met (need 1 more officer)."), 1)
+        self.assertNotIn("A quorum was present", text)
+        self.assertNotIn("A quorum was **not** present", text)
         self.assertLess(text.index("Members present"), text.index("Quorum: Not met"))
         self.assertLess(text.index("Quorum: Not met"), text.index("**Approval of Previous Minutes:**"))
+
+    def test_no_rule_gives_only_old_line(self):
+        text = render_minutes(self._meeting())
+        self.assertIn("A quorum was present", text)
+        self.assertEqual(text.count("A quorum was present"), 1)
+        self.assertNotIn("Quorum: Met", text)
+        self.assertNotIn("Quorum: Not met", text)
+        self.assertNotIn("Checked manually", text)
+
+    def test_text_rule_gives_only_manual_line(self):
+        meeting = self._meeting(org_quorum_line="Quorum rule: Ask the commander. (Checked manually.)")
+        text = render_minutes(meeting)
+        self.assertIn("Quorum rule: Ask the commander. (Checked manually.)", text)
+        self.assertEqual(text.count("Quorum rule: Ask the commander. (Checked manually.)"), 1)
+        self.assertNotIn("A quorum was present", text)
+        self.assertNotIn("A quorum was **not** present", text)
 
     def test_upsert_regenerates_and_does_not_duplicate(self):
         meeting = self._meeting(org_quorum_line="Quorum: Not met (need 1 more officer).")
@@ -300,13 +318,8 @@ class QuorumMinutesLineTests(unittest.TestCase):
         third = upsert_quorum_minutes_line(second, "Quorum: Met (Commander presiding; 3 other officers present).")
         self.assertEqual(third.count("Quorum: Met (Commander presiding; 3 other officers present)."), 1)
         self.assertNotIn("Quorum: Not met", third)
+        self.assertNotIn("A quorum was present", third)
         self.assertLess(third.index("Members present"), third.index("Quorum: Met"))
-
-    def test_absent_when_no_rule(self):
-        text = render_minutes(self._meeting())
-        self.assertNotIn("Quorum: Met", text)
-        self.assertNotIn("Quorum: Not met", text)
-        self.assertNotIn("Checked manually", text)
 
     def test_hand_edit_is_not_clobbered(self):
         meeting = self._meeting(
@@ -348,12 +361,16 @@ class QuorumMinutesLineTests(unittest.TestCase):
         first = render_minutes(meeting)
         self.assertIn("Quorum: Not met (need 1 more officer).", first)
         self.assertEqual(first.count("Quorum: Not met (need 1 more officer)."), 1)
+        self.assertNotIn("A quorum was present", first)
+        self.assertNotIn("A quorum was **not** present", first)
         meeting.present = ["Jeff Shumaker", "Herm Clear", "Mike Featherstone", "Ted Ruser"]
         vault.save_meeting(meeting)
         again = render_minutes(vault.load_meeting(meeting.id))
         self.assertIn("Quorum: Met (Commander presiding; 3 other officers present).", again)
         self.assertEqual(again.count("Quorum: Met (Commander presiding; 3 other officers present)."), 1)
         self.assertNotIn("Quorum: Not met", again)
+        self.assertNotIn("A quorum was present", again)
+        self.assertNotIn("A quorum was **not** present", again)
 
 
 class QuorumUiContractTests(unittest.TestCase):
@@ -469,6 +486,8 @@ class QuorumHttpTests(unittest.TestCase):
         )
         self.assertEqual(created["org_quorum"]["status"], "not_met")
         self.assertIn("Quorum: Not met (need 1 more officer).", created["markdown"])
+        self.assertNotIn("A quorum was present", created["markdown"])
+        self.assertNotIn("A quorum was **not** present", created["markdown"])
 
 
 if __name__ == "__main__":
