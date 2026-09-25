@@ -246,6 +246,49 @@ def _known_title_affix(line: str) -> RosterEntry | None:
     return None
 
 
+_ORDINAL_WORDS = (
+    (re.compile(r"\bfirst\b", re.I), "1st"),
+    (re.compile(r"\bsecond\b", re.I), "2nd"),
+    (re.compile(r"\bthird\b", re.I), "3rd"),
+)
+
+
+def normalize_title(value: str) -> str:
+    """Case-insensitive title key: trim, collapse spaces, 1st/First, Vice/Vice Commander."""
+    compact = " ".join((value or "").split()).strip()
+    if not compact:
+        return ""
+    known = _known_title(compact) or _canonical_title(compact)
+    folded = known.casefold()
+    if folded.startswith("the "):
+        folded = folded[4:]
+    for pat, repl in _ORDINAL_WORDS:
+        folded = pat.sub(repl, folded)
+    folded = " ".join(folded.split())
+    if folded == "vice":
+        folded = "vice commander"
+    if re.fullmatch(r"(?:1st|2nd|3rd|senior|junior) vice", folded):
+        folded = f"{folded} commander"
+    return folded
+
+
+def titles_match(left: str, right: str) -> bool:
+    key = normalize_title(left)
+    return bool(key) and key == normalize_title(right)
+
+
+def display_title(value: str) -> str:
+    """Stable label for a title, preferring 1st/2nd over First/Second when both exist."""
+    key = normalize_title(value)
+    if not key:
+        return " ".join((value or "").split()).strip()
+    matches = [title for title in KNOWN_TITLES if normalize_title(title) == key]
+    if not matches:
+        return " ".join((value or "").split()).strip()
+    numbered = [title for title in matches if title[:1].isdigit()]
+    return numbered[0] if numbered else matches[0]
+
+
 def _known_title(value: str) -> str:
     compact = " ".join((value or "").split())
     if not compact:

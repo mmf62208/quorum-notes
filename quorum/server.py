@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from . import ai, backup, config, demo, roster, settings as app_settings, signin, vault
 from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
+from .quorum_rule import evaluate_quorum, normalize_quorum_rule, present_people_from
 
 
 def _meeting_payload(meeting: Meeting) -> dict:
@@ -19,6 +20,7 @@ def _meeting_payload(meeting: Meeting) -> dict:
         "meeting": meeting.to_dict(),
         "markdown": render_minutes(meeting),
         "agenda": agenda_status(meeting),
+        "org_quorum": vault.org_quorum_for(meeting),
     }
 
 
@@ -157,10 +159,26 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/roster/parse":
                 text = str((_read_json(self) or {}).get("text") or "")
                 return _json(self, 200, roster.parse_roster(text))
+            if path == "/api/quorum/evaluate":
+                body = _read_json(self) or {}
+                prefs = app_settings.load_settings()
+                rule = normalize_quorum_rule(body.get("quorum_rule", prefs.get("quorum_rule")))
+                titles: dict[str, str] = {}
+                titles.update(prefs.get("roster_titles") or {})
+                titles.update(body.get("roster_titles") or {})
+                raw_people = body.get("present_people")
+                if raw_people:
+                    people = present_people_from(raw_people, titles)
+                else:
+                    people = present_people_from(body.get("present") or [], titles)
+                result = evaluate_quorum(rule, people)
+                return _json(self, 200, {"result": None if result is None else result.to_dict()})
             if path.startswith("/api/meetings/") and path.endswith("/roster"):
                 meeting_id = path.split("/")[3]
                 meeting = vault.load_meeting(meeting_id)
-                names = (_read_json(self) or {}).get("names") or []
+                payload = _read_json(self) or {}
+                names = payload.get("names") or []
+                extra_titles = payload.get("titles") or {}
                 existing = list(meeting.roster)
                 keys = {signin.normalize_name(n) for n in existing if n}
                 for raw in names:
@@ -173,6 +191,14 @@ class Handler(BaseHTTPRequestHandler):
                     existing.append(name)
                     keys.add(key)
                 meeting.roster = existing
+                if isinstance(extra_titles, dict) and extra_titles:
+                    merged = dict(meeting.roster_titles or {})
+                    for raw_name, raw_title in extra_titles.items():
+                        name = " ".join(str(raw_name or "").split()).strip()
+                        title = " ".join(str(raw_title or "").split()).strip()
+                        if name and title:
+                            merged[name] = title
+                    meeting.roster_titles = merged
                 vault.save_meeting(meeting)
                 return _json(self, 200, _meeting_payload(meeting))
             if path == "/api/demo":

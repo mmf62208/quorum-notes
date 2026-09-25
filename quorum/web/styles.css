@@ -108,6 +108,26 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
   overflow-y: auto;
   resize: vertical;
 }
+#wizard .wiz-quorum { margin: 1rem 0 0.5rem; }
+#wizard .wiz-quorum h2 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+#wizard .quorum-titles { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.35rem 0; }
+#wizard #wiz-quorum-struct-notes,
+#wizard #wiz-quorum-text {
+  min-height: 4rem;
+  max-height: min(8rem, 24vh);
+  overflow-y: auto;
+  resize: vertical;
+}
+.org-quorum-banner {
+  display: flex; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; align-items: flex-start;
+  border: 1px solid var(--line); background: #0f0d0b; padding: 0.65rem 0.75rem; margin: 0 0 0.7rem;
+}
+.org-quorum-banner .org-quorum-title { margin: 0; font-weight: 700; }
+.org-quorum-banner.met { border-color: var(--good); }
+.org-quorum-banner.met .org-quorum-title { color: var(--good); }
+.org-quorum-banner.not_met { border-color: var(--bad); }
+.org-quorum-banner.not_met .org-quorum-title { color: var(--bad); }
+.org-quorum-banner.manual { border-color: var(--gold); }
 #wizard #btn-wiz-save { width: 100%; }
 .roster-confirm { list-style: none; padding: 0; margin: 0.35rem 0; max-width: 36rem; }
 .roster-confirm li {

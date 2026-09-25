@@ -16,6 +16,7 @@ from .naming import meeting_stem
 from .retention import should_delete_audio
 from .templates import opening_for
 from . import settings as app_settings
+from .quorum_rule import apply_result_to_meeting, evaluate_quorum, normalize_quorum_rule, present_people_from
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{4,120}$")
 
@@ -83,6 +84,7 @@ def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
     fields.setdefault("location", prefs.get("default_location", ""))
     fields.setdefault("called_to_order_by", prefs.get("called_to_order_by", ""))
     fields.setdefault("roster", list(prefs.get("roster") or []))
+    fields.setdefault("roster_titles", dict(prefs.get("roster_titles") or {}))
     fields.setdefault("roberts", bool(prefs.get("roberts", True)))
     fields.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     if "opening" not in fields:
@@ -150,9 +152,29 @@ def apply_retention(meeting: Meeting) -> bool:
     return False
 
 
+def _titles_for(meeting: Meeting, prefs: dict[str, Any] | None = None) -> dict[str, str]:
+    titles: dict[str, str] = {}
+    source = prefs if prefs is not None else app_settings.load_settings()
+    titles.update(source.get("roster_titles") or {})
+    titles.update(meeting.roster_titles or {})
+    return titles
+
+
+def org_quorum_for(meeting: Meeting, prefs: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    source = prefs if prefs is not None else app_settings.load_settings()
+    rule = normalize_quorum_rule(source.get("quorum_rule"))
+    people = present_people_from(meeting.present, _titles_for(meeting, source))
+    result = evaluate_quorum(rule, people)
+    return None if result is None else result.to_dict()
+
+
 def save_meeting(meeting: Meeting) -> Meeting:
     enforce_motion_rules(meeting)
     meeting.agenda_index = clamp_agenda_index(int(meeting.agenda_index or 0))
+    prefs = app_settings.load_settings()
+    rule = normalize_quorum_rule(prefs.get("quorum_rule"))
+    result = evaluate_quorum(rule, present_people_from(meeting.present, _titles_for(meeting, prefs)))
+    apply_result_to_meeting(meeting, result)
     folder = _meeting_dir(meeting.id)
     folder.mkdir(parents=True, exist_ok=True)
     apply_retention(meeting)
