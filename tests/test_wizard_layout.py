@@ -29,3 +29,6 @@ class WizardLayoutTests(unittest.TestCase):
             html.index('id="btn-wiz-save"'),
             "Save must stay after the roster so Tab order is unchanged",
         )
+        self.assertLess(html.index('id="wiz-roster-confirm"'), html.index('id="wiz-quorum"'))
+        self.assertLess(html.index('id="wiz-quorum"'), html.index('id="btn-wiz-save"'))
+        self.assertIn("Any special quorum rule?", html)

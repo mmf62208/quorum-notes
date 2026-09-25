@@ -29,6 +29,239 @@ function confirmedRosterNames(draft) {
   return names;
 }
 
+function confirmedRosterTitles(draft) {
+  const titles = {};
+  (draft || []).forEach((row) => {
+    const name = String((row && row.name) || "").replace(/\s+/g, " ").trim();
+    const title = String((row && row.title) || "").replace(/\s+/g, " ").trim();
+    if (name && title) titles[name] = title;
+  });
+  return titles;
+}
+
+function rosterTextFromSettings() {
+  const names = (settings && settings.roster) || [];
+  const titles = (settings && settings.roster_titles) || {};
+  const lookup = {};
+  Object.entries(titles).forEach(([name, title]) => {
+    lookup[String(name).toLowerCase()] = title;
+  });
+  return names
+    .map((name) => {
+      const title = lookup[String(name).toLowerCase()] || "";
+      return title ? `${title}: ${name}` : name;
+    })
+    .join("\n");
+}
+
+function applyStoredRosterTitles(draft) {
+  const titles = (settings && settings.roster_titles) || {};
+  const lookup = {};
+  Object.entries(titles).forEach(([name, title]) => {
+    lookup[String(name).toLowerCase()] = title;
+  });
+  (draft || []).forEach((row) => {
+    if (!row || row.title) return;
+    const found = lookup[String(row.name || "").toLowerCase()];
+    if (found) row.title = found;
+  });
+  return draft;
+}
+
+const SAL_484_TITLES = ["Commander", "1st Vice Commander", "2nd Vice Commander"];
+const SAL_484_NOTES = "SAL Post 484: Commander or presiding 1st/2nd Vice + at least 3 other officers";
+let wizQuorumExtraTitles = [];
+let lastOrgQuorum = null;
+let orgQuorumDismissedKey = "";
+
+function selectedQuorumMode() {
+  const picked = document.querySelector('input[name="wiz-quorum-mode"]:checked');
+  return (picked && picked.value) || "none";
+}
+
+function selectedPresidingTitles() {
+  return [...document.querySelectorAll("#wiz-quorum-titles input[type=checkbox]:checked")]
+    .map((el) => el.value)
+    .filter(Boolean);
+}
+
+function formatPresidingPhrase(titles) {
+  const keys = (titles || []).map((t) => String(t || "").toLowerCase());
+  const hasCmd = keys.some((t) => t.includes("commander") && !t.includes("vice"));
+  const has1st = keys.some((t) => t.includes("1st") || t.includes("first"));
+  const has2nd = keys.some((t) => t.includes("2nd") || t.includes("second"));
+  if (hasCmd && has1st && has2nd) return "Commander or 1st/2nd Vice";
+  if ((titles || []).length === 1) return titles[0];
+  if ((titles || []).length === 2) return `${titles[0]} or ${titles[1]}`;
+  if ((titles || []).length > 2) return `${titles.slice(0, -1).join(", ")}, or ${titles[titles.length - 1]}`;
+  return "";
+}
+
+function previewQuorumRule(rule) {
+  if (!rule || rule.mode === "none") return "No special quorum rule.";
+  if (rule.mode === "text") return rule.notes || "Check quorum manually.";
+  const titles = rule.presiding_any_of || [];
+  const phrase = formatPresidingPhrase(titles);
+  const minOff = Number(rule.min_other_officers) || 0;
+  if (phrase === "Commander or 1st/2nd Vice" && minOff === 3) {
+    return "Quorum = Commander or 1st/2nd Vice presiding, plus at least 3 other officers.";
+  }
+  const bits = [];
+  if (phrase) bits.push(`${phrase} presiding`);
+  if (minOff) bits.push(`plus at least ${minOff} other officer${minOff === 1 ? "" : "s"}`);
+  if (rule.min_members_total) {
+    bits.push(`a total of at least ${rule.min_members_total} members present`);
+  }
+  if (!bits.length) return "No special quorum rule.";
+  return `Quorum = ${bits.join(", ")}.`;
+}
+
+function readWizardQuorumRule() {
+  const mode = selectedQuorumMode();
+  if (mode === "text") {
+    return {
+      mode: "text",
+      presiding_any_of: [],
+      min_other_officers: 0,
+      min_members_total: null,
+      notes: ($("wiz-quorum-text") && $("wiz-quorum-text").value.trim()) || "",
+    };
+  }
+  if (mode !== "structured") {
+    return {
+      mode: "none",
+      presiding_any_of: [],
+      min_other_officers: 0,
+      min_members_total: null,
+      notes: "",
+    };
+  }
+  const minOff = Number(($("wiz-quorum-min-officers") && $("wiz-quorum-min-officers").value) || 0);
+  const rawTotal = $("wiz-quorum-min-members") ? $("wiz-quorum-min-members").value : "";
+  const minTotal = String(rawTotal || "").trim() === "" ? null : Number(rawTotal);
+  return {
+    mode: "structured",
+    presiding_any_of: selectedPresidingTitles(),
+    min_other_officers: Number.isFinite(minOff) ? minOff : 0,
+    min_members_total: Number.isFinite(minTotal) && minTotal > 0 ? minTotal : null,
+    notes: ($("wiz-quorum-struct-notes") && $("wiz-quorum-struct-notes").value) || "",
+  };
+}
+
+function rosterTitleChoices() {
+  const seen = new Set();
+  const titles = [];
+  const add = (value) => {
+    const title = String(value || "").replace(/\s+/g, " ").trim();
+    if (!title) return;
+    const key = title.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    titles.push(title);
+  };
+  (wizRosterDraft || []).forEach((row) => add(row.title));
+  Object.values((settings && settings.roster_titles) || {}).forEach(add);
+  ((settings.quorum_rule && settings.quorum_rule.presiding_any_of) || []).forEach(add);
+  wizQuorumExtraTitles.forEach(add);
+  return titles;
+}
+
+function refreshQuorumTitleChoices() {
+  const box = $("wiz-quorum-titles");
+  if (!box) return;
+  const checked = new Set(selectedPresidingTitles().map((t) => t.toLowerCase()));
+  box.innerHTML = "";
+  rosterTitleChoices().forEach((title) => {
+    const label = document.createElement("label");
+    label.className = "check";
+    const boxEl = document.createElement("input");
+    boxEl.type = "checkbox";
+    boxEl.value = title;
+    boxEl.checked = checked.has(title.toLowerCase());
+    boxEl.onchange = updateQuorumPreview;
+    label.appendChild(boxEl);
+    label.appendChild(document.createTextNode(" " + title));
+    box.appendChild(label);
+  });
+  updateQuorumModePanels();
+  updateQuorumPreview();
+}
+
+function updateQuorumModePanels() {
+  const mode = selectedQuorumMode();
+  if ($("wiz-quorum-structured")) $("wiz-quorum-structured").hidden = mode !== "structured";
+  if ($("wiz-quorum-text-wrap")) $("wiz-quorum-text-wrap").hidden = mode !== "text";
+}
+
+function updateQuorumPreview() {
+  const el = $("wiz-quorum-preview");
+  if (el) el.textContent = previewQuorumRule(readWizardQuorumRule());
+}
+
+function fillWizardQuorum(rule) {
+  const data = rule || { mode: "none" };
+  const mode = data.mode || "none";
+  document.querySelectorAll('input[name="wiz-quorum-mode"]').forEach((el) => {
+    el.checked = el.value === mode;
+  });
+  wizQuorumExtraTitles = [...((data.presiding_any_of || []).map((t) => String(t || "").trim()).filter(Boolean))];
+  if ($("wiz-quorum-min-officers")) $("wiz-quorum-min-officers").value = data.min_other_officers || 0;
+  if ($("wiz-quorum-min-members")) {
+    $("wiz-quorum-min-members").value = data.min_members_total == null ? "" : data.min_members_total;
+  }
+  if ($("wiz-quorum-struct-notes")) $("wiz-quorum-struct-notes").value = mode === "structured" ? data.notes || "" : "";
+  if ($("wiz-quorum-text")) $("wiz-quorum-text").value = mode === "text" ? data.notes || "" : "";
+  refreshQuorumTitleChoices();
+  const wanted = new Set((data.presiding_any_of || []).map((t) => String(t || "").toLowerCase()));
+  document.querySelectorAll("#wiz-quorum-titles input[type=checkbox]").forEach((el) => {
+    el.checked = wanted.has(el.value.toLowerCase());
+  });
+  updateQuorumPreview();
+}
+
+function applySal484Example() {
+  document.querySelectorAll('input[name="wiz-quorum-mode"]').forEach((el) => {
+    el.checked = el.value === "structured";
+  });
+  SAL_484_TITLES.forEach((title) => {
+    if (!wizQuorumExtraTitles.some((t) => t.toLowerCase() === title.toLowerCase())) {
+      wizQuorumExtraTitles.push(title);
+    }
+  });
+  if ($("wiz-quorum-min-officers")) $("wiz-quorum-min-officers").value = 3;
+  if ($("wiz-quorum-struct-notes")) $("wiz-quorum-struct-notes").value = SAL_484_NOTES;
+  refreshQuorumTitleChoices();
+  document.querySelectorAll("#wiz-quorum-titles input[type=checkbox]").forEach((el) => {
+    if (SAL_484_TITLES.some((t) => t.toLowerCase() === el.value.toLowerCase())) el.checked = true;
+  });
+  updateQuorumPreview();
+}
+
+function renderOrgQuorumBanner(result) {
+  const el = $("org-quorum-banner");
+  if (!el) return;
+  lastOrgQuorum = result || null;
+  if (!result) {
+    el.hidden = true;
+    return;
+  }
+  const key = `${result.status}|${result.need || ""}|${result.minutes_line || result.banner_title || ""}`;
+  if (orgQuorumDismissedKey === key) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.className = "org-quorum-banner " + (result.status || "");
+  if ($("org-quorum-title")) $("org-quorum-title").textContent = result.banner_title || "";
+  if ($("org-quorum-detail")) $("org-quorum-detail").textContent = result.banner_detail || "";
+}
+
+function openQuorumRuleEditor() {
+  showWizard(true);
+  const section = $("wiz-quorum");
+  if (section && section.scrollIntoView) section.scrollIntoView({ block: "start" });
+}
+
 function renderRosterConfirm(listId, draft) {
   const list = $(listId);
   if (!list) return;
@@ -84,8 +317,10 @@ async function refreshWizardRosterDraft(text) {
     title: entry.title || "",
     raw: entry.raw || "",
   }));
+  applyStoredRosterTitles(wizRosterDraft);
   renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
   showRosterFlags("wiz-roster-flags", parsed.skipped);
+  refreshQuorumTitleChoices();
   return parsed;
 }
 
@@ -290,6 +525,8 @@ function onPerson(name) {
     if (!(current.present || []).includes(name)) current.present.push(name);
     $("save-status").textContent = `${name} marked speaking`;
     renderPeople();
+    updateQuorum();
+    persistAttendance();
     return;
   }
   if (pendingRole === "1st" || pendingRole === "2nd") {
@@ -304,6 +541,7 @@ function onPerson(name) {
     $("save-status").textContent = `${name} arrived late`;
     renderPeople();
     updateQuorum();
+    persistAttendance();
     return;
   }
   const present = new Set(current.present || []);
@@ -312,6 +550,12 @@ function onPerson(name) {
   current.present = [...present];
   renderPeople();
   updateQuorum();
+  persistAttendance();
+}
+
+function persistAttendance() {
+  if (!current || !current.id) return;
+  saveMeeting().catch(() => {});
 }
 
 function updateQuorum() {
@@ -449,6 +693,7 @@ async function openMeeting(id) {
   renderSigninReview();
   updateQuorum();
   $("minutes").textContent = data.markdown;
+  renderOrgQuorumBanner(data.org_quorum);
   $("player").src = current.has_audio ? `/api/meetings/${id}/audio?t=${Date.now()}` : "";
   $("btn-download").href = `/api/meetings/${id}/minutes.md`;
   $("btn-download").setAttribute("download", `${current.file_stem || id}-minutes.md`);
@@ -468,6 +713,7 @@ async function saveMeeting() {
   });
   current = data.meeting;
   $("minutes").textContent = data.markdown;
+  renderOrgQuorumBanner(data.org_quorum);
   renderLists();
   showStep(current.agenda_index || 0);
   $("save-status").textContent = `Saved ${new Date().toLocaleTimeString()}`;
@@ -785,11 +1031,18 @@ function showWizard(force = false) {
   $("wiz-template").value = settings.template || "sal";
   $("wiz-retention").value = settings.retention || "until_approved";
   $("wiz-roberts").checked = settings.roberts !== false;
-  $("wiz-roster").value = (settings.roster || []).join("\n");
+  $("wiz-roster").value = rosterTextFromSettings();
+  fillWizardQuorum(settings.quorum_rule);
   $("wizard").hidden = false;
   refreshWizardRosterDraft($("wiz-roster").value).catch(() => {
-    wizRosterDraft = (settings.roster || []).map((name) => ({ name, title: "", raw: name }));
+    wizRosterDraft = (settings.roster || []).map((name) => ({
+      name,
+      title: (settings.roster_titles && settings.roster_titles[name]) || "",
+      raw: name,
+    }));
+    applyStoredRosterTitles(wizRosterDraft);
     renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
+    refreshQuorumTitleChoices();
   });
 }
 
@@ -840,10 +1093,14 @@ $("btn-wiz-save").onclick = async () => {
         retention: $("wiz-retention").value,
         roberts: $("wiz-roberts").checked,
         roster: confirmedRosterNames(wizRosterDraft),
+        roster_titles: confirmedRosterTitles(wizRosterDraft),
+        quorum_rule: readWizardQuorumRule(),
       }),
     }).then((d) => d.settings);
     $("wizard").hidden = true;
     if ($("vault-path")) $("vault-path").textContent = "Setup saved on this computer.";
+    if (current && current.id) persistAttendance();
+    else renderOrgQuorumBanner(null);
   } catch (e) {
     if (err) err.textContent = e.message || "Could not save setup";
     else showBootError(e.message || "Could not save setup");
@@ -861,7 +1118,42 @@ $("btn-wiz-roster-add").onclick = () => {
   addDraftName(wizRosterDraft, $("wiz-roster-add-name").value);
   $("wiz-roster-add-name").value = "";
   renderRosterConfirm("wiz-roster-confirm", wizRosterDraft);
+  refreshQuorumTitleChoices();
 };
+document.querySelectorAll('input[name="wiz-quorum-mode"]').forEach((el) => {
+  el.onchange = () => {
+    updateQuorumModePanels();
+    updateQuorumPreview();
+  };
+});
+if ($("btn-wiz-quorum-add-title")) {
+  $("btn-wiz-quorum-add-title").onclick = () => {
+    const title = ($("wiz-quorum-add-title") && $("wiz-quorum-add-title").value || "").replace(/\s+/g, " ").trim();
+    if (!title) return;
+    if (!wizQuorumExtraTitles.some((t) => t.toLowerCase() === title.toLowerCase())) {
+      wizQuorumExtraTitles.push(title);
+    }
+    $("wiz-quorum-add-title").value = "";
+    refreshQuorumTitleChoices();
+    document.querySelectorAll("#wiz-quorum-titles input[type=checkbox]").forEach((box) => {
+      if (box.value.toLowerCase() === title.toLowerCase()) box.checked = true;
+    });
+    updateQuorumPreview();
+  };
+}
+if ($("btn-wiz-quorum-sal")) $("btn-wiz-quorum-sal").onclick = applySal484Example;
+["wiz-quorum-min-officers", "wiz-quorum-min-members", "wiz-quorum-struct-notes", "wiz-quorum-text"].forEach((id) => {
+  const el = $(id);
+  if (el) el.addEventListener("input", updateQuorumPreview);
+});
+if ($("btn-org-quorum-dismiss")) {
+  $("btn-org-quorum-dismiss").onclick = () => {
+    const result = lastOrgQuorum || {};
+    orgQuorumDismissedKey = `${result.status || ""}|${result.need || ""}|${result.minutes_line || result.banner_title || ""}`;
+    if ($("org-quorum-banner")) $("org-quorum-banner").hidden = true;
+  };
+}
+if ($("btn-org-quorum-edit")) $("btn-org-quorum-edit").onclick = openQuorumRuleEditor;
 $("btn-demo").onclick = async () => {
   try {
     const data = await api("/api/demo", { method: "POST" });
@@ -1009,12 +1301,13 @@ $("btn-apply-roster").onclick = async () => {
     const data = await api(`/api/meetings/${current.id}/roster`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ names }),
+      body: JSON.stringify({ names, titles: confirmedRosterTitles(meetRosterDraft) }),
     });
     current = data.meeting;
     fillHeader();
     renderPeople();
     $("minutes").textContent = data.markdown;
+    renderOrgQuorumBanner(data.org_quorum);
     $("save-status").textContent = `Roster updated (${names.length} confirmed). Not marked present.`;
   } catch (e) {
     $("save-status").textContent = e.message || "Could not update roster";
@@ -1144,6 +1437,7 @@ $("btn-apply-signin").onclick = async () => {
   fillHeader();
   renderPeople();
   $("minutes").textContent = data.markdown;
+  renderOrgQuorumBanner(data.org_quorum);
   $("save-status").textContent = `Sign-in applied (${(data.signin && data.signin.matched.length) || names.length})`;
 };
 $("spk-device").onchange = () => applySink();

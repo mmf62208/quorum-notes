@@ -44,6 +44,33 @@
         <input id="wiz-roster-add-name" placeholder="Add name" />
         <button type="button" id="btn-wiz-roster-add">Add</button>
       </div>
+      <section id="wiz-quorum" class="wiz-quorum">
+        <h2>Any special quorum rule?</h2>
+        <p class="hint">Optional. An unmet quorum never stops recording or the meeting.</p>
+        <h3>Quorum rule</h3>
+        <label class="check"><input type="radio" name="wiz-quorum-mode" value="none" checked /> No special rule</label>
+        <label class="check"><input type="radio" name="wiz-quorum-mode" value="structured" /> Pick officers + count</label>
+        <label class="check"><input type="radio" name="wiz-quorum-mode" value="text" /> Describe it in words</label>
+        <div id="wiz-quorum-structured" hidden>
+          <p>Who must be present to preside?</p>
+          <p class="hint">At least one of these</p>
+          <div id="wiz-quorum-titles" class="quorum-titles"></div>
+          <div class="row compact">
+            <input id="wiz-quorum-add-title" placeholder="Add title" />
+            <button type="button" id="btn-wiz-quorum-add-title">Add title</button>
+          </div>
+          <label>Plus at least <input id="wiz-quorum-min-officers" type="number" min="0" value="0" /> other officers</label>
+          <label>Or a total of at least <input id="wiz-quorum-min-members" type="number" min="0" placeholder="blank = unused" /> members present</label>
+          <p class="hint" id="wiz-quorum-preview"></p>
+          <button type="button" id="btn-wiz-quorum-sal">Use example: SAL Post 484</button>
+          <label>Notes <textarea id="wiz-quorum-struct-notes" rows="2"></textarea></label>
+        </div>
+        <div id="wiz-quorum-text-wrap" hidden>
+          <label>Describe the rule
+            <textarea id="wiz-quorum-text" rows="3" placeholder="Write what counts as a quorum"></textarea>
+          </label>
+        </div>
+      </section>
       <p class="hint" id="wiz-error"></p>
     </div>
     <div class="wiz-footer">
@@ -122,6 +149,16 @@
       </div>
 
       <div id="step-roll_call" class="step-panel" hidden>
+      <div id="org-quorum-banner" class="org-quorum-banner" hidden>
+        <div>
+          <p id="org-quorum-title" class="org-quorum-title"></p>
+          <p id="org-quorum-detail" class="hint"></p>
+        </div>
+        <div class="row compact">
+          <button type="button" id="btn-org-quorum-edit">Edit rule</button>
+          <button type="button" id="btn-org-quorum-dismiss">Dismiss</button>
+        </div>
+      </div>
       <h3>Who is here — tap to mark present, tap again while recording to tag the speaker</h3>
       <div id="people" class="chips"></div>
       <div class="row compact">

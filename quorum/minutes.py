@@ -135,6 +135,9 @@ class Meeting:
     has_transcript: bool = False
     created_at: str = ""
     updated_at: str = ""
+    roster_titles: dict[str, str] = field(default_factory=dict)
+    org_quorum_line: str = ""
+    org_quorum_line_edited: bool = False
 
     def quorum_required(self) -> int:
         if self.quorum_rule == "fixed":
@@ -187,6 +190,8 @@ class Meeting:
         ]
         payload["photos"] = [Photo(**p) if isinstance(p, dict) else p for p in payload.get("photos", [])]
         payload["documents"] = [_as_document(d) for d in payload.get("documents", [])]
+        titles = payload.get("roster_titles") or {}
+        payload["roster_titles"] = dict(titles) if isinstance(titles, dict) else {}
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         return cls(**{k: v for k, v in payload.items() if k in known})
 
@@ -225,7 +230,9 @@ def render_minutes(meeting: Meeting) -> str:
     if meeting.guests:
         lines.append("Guests: " + ", ".join(meeting.guests) + ".")
         lines.append("")
-    if rc["quorum"]:
+    if meeting.org_quorum_line:
+        lines.append(meeting.org_quorum_line)
+    elif rc["quorum"]:
         lines.append(
             f"A quorum was present ({rc['present_count']} present; {rc['required']} required)."
         )
