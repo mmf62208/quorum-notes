@@ -316,11 +316,34 @@ def detect_cues(text: str) -> DetectedCues:
     )
 
 
+_STYLE_DEFAULTS = {
+    "minutes_name_style": "first",
+    "minutes_motion_phrasing": "moved_seconded",
+    "minutes_signature_shape": "respectfully",
+    "minutes_closing": "",
+}
+
+
 def _field_current(settings: dict[str, Any] | None, field: str) -> Any:
     prefs = settings or {}
     if field not in prefs:
         return None
     return prefs.get(field)
+
+
+def _is_custom_style(field: str, value: Any) -> bool:
+    """True when a stored value is a real hand edit, not the C1 default."""
+    if value in (None, "", [], ()):
+        return False
+    if field == "minutes_heading_order":
+        keys = parse_heading_keys(value)
+        return bool(keys) and normalize_heading_order(keys) != list(DEFAULT_HEADING_ORDER)
+    default = _STYLE_DEFAULTS.get(field)
+    if default is None:
+        return True
+    if field == "minutes_closing":
+        return bool(str(value or "").strip())
+    return str(value).strip().casefold() != str(default).casefold()
 
 
 def _style_item(
@@ -332,7 +355,7 @@ def _style_item(
     current_label: str,
 ) -> dict[str, Any]:
     existing = _field_current(settings, field)
-    has_existing = existing not in (None, "", [], ())
+    has_existing = _is_custom_style(field, existing)
     same = False
     if field == "minutes_heading_order":
         same = has_existing and normalize_heading_order(existing) == normalize_heading_order(proposed)
@@ -678,7 +701,7 @@ def plan_apply(
             continue
         value = _coerce_style_value(field, raw.get("value") if "value" in raw else raw.get("text"))
         existing = prefs.get(field)
-        has_existing = field in prefs and existing not in (None, "", [], ())
+        has_existing = field in prefs and _is_custom_style(field, existing)
         if has_existing and not raw.get("overwrite"):
             current_same = existing == value
             if field == "minutes_heading_order":

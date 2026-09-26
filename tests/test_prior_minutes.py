@@ -210,6 +210,28 @@ class PriorApplyTests(unittest.TestCase):
         self.assertNotIn("minutes_closing", plan.update)
         self.assertTrue(any(row["reason"] == "exists" for row in plan.skipped))
 
+    def test_c1_defaults_do_not_block_first_import(self):
+        settings = {
+            "minutes_name_style": "first",
+            "minutes_motion_phrasing": "moved_seconded",
+            "minutes_signature_shape": "respectfully",
+            "minutes_closing": "",
+        }
+        scan = prior_minutes.scan_text(MOTION_BY, filename="motion.txt", settings=settings)
+        motion = next(row for row in scan.style if row["field"] == "minutes_motion_phrasing")
+        self.assertFalse(motion["would_overwrite"])
+        plan = prior_minutes.plan_apply(
+            settings,
+            {
+                "style": [
+                    {"confirm": True, "overwrite": False, "field": row["field"], "value": row["value"]}
+                    for row in scan.style
+                ]
+            },
+        )
+        self.assertEqual(plan.update.get("minutes_motion_phrasing"), "motion_by")
+        self.assertEqual(plan.update.get("minutes_name_style"), "full")
+
     def test_overwrite_closing_with_explicit_confirm(self):
         settings = {"minutes_closing": "Leave this."}
         plan = prior_minutes.plan_apply(
