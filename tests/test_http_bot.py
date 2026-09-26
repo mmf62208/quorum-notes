@@ -162,7 +162,7 @@ class HttpBotTests(unittest.TestCase):
         mail = self._json("GET", f"/api/meetings/{mid}/email")
         self.assertTrue(mail["subject"])
         self.assertIn("Meeting Minutes", mail["body"])
-        self.assertIn("Herm Clear seconded", mail["body"])
+        self.assertIn("Herm seconded", mail["body"])
         md = self._json("GET", f"/api/meetings/{mid}/minutes.md")
         self.assertIn(b"Roll Call / Quorum", md)
         printed = self._json("GET", f"/api/meetings/{mid}/print.html")
