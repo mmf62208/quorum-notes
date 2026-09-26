@@ -77,11 +77,13 @@ class Photo:
     data_url: str = ""
 
 
-DOC_LABELS = ("finance", "agenda", "handout", "other")
+DOC_LABELS = ("finance", "agenda", "handout", "bylaws", "standing_rules", "other")
 
 
 def normalize_doc_label(label: str) -> str:
-    key = (label or "other").strip().casefold()
+    key = (label or "other").strip().casefold().replace(" ", "_").replace("-", "_")
+    if key in {"bylaw", "by_laws"}:
+        key = "bylaws"
     return key if key in DOC_LABELS else "other"
 
 

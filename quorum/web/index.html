@@ -161,6 +161,19 @@
       </div>
 
       <p id="quorum-out" class="quorum-out"></p>
+      <section id="bylaws-review" hidden>
+        <h3>Bylaws / standing-rules suggestions</h3>
+        <p class="hint">Confirm or edit each item. Nothing is applied until you confirm. Customs are reminders only.</p>
+        <p id="bylaws-scan-status" class="hint"></p>
+        <ul id="bylaws-suggestions"></ul>
+        <div class="row compact">
+          <button type="button" class="primary" id="btn-bylaws-confirm">Confirm selected</button>
+          <button type="button" id="btn-bylaws-skip">Skip</button>
+          <button type="button" id="btn-bylaws-open-rule">Open quorum rule</button>
+          <button type="button" id="btn-bylaws-open-officers">Open officers</button>
+        </div>
+        <p id="bylaws-apply-status" class="hint"></p>
+      </section>
       <nav id="agenda" class="chips agenda"></nav>
       <div class="row compact">
         <button type="button" id="btn-prev-step">Back</button>
@@ -198,6 +211,8 @@
             <option value="finance">Finance</option>
             <option value="agenda">Agenda</option>
             <option value="handout">Handout</option>
+            <option value="bylaws">Bylaws</option>
+            <option value="standing_rules">Standing rules</option>
             <option value="other" selected>Other</option>
           </select>
         </label>
@@ -253,6 +268,8 @@
               <option value="finance" selected>Finance</option>
               <option value="agenda">Agenda</option>
               <option value="handout">Handout</option>
+              <option value="bylaws">Bylaws</option>
+              <option value="standing_rules">Standing rules</option>
               <option value="other">Other</option>
             </select>
           </label>

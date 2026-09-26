@@ -803,6 +803,123 @@ function formatDocBytes(n) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isRulesLabel(label) {
+  return label === "bylaws" || label === "standing_rules";
+}
+
+let bylawsScan = null;
+
+function hideBylawsReview() {
+  bylawsScan = null;
+  if ($("bylaws-review")) $("bylaws-review").hidden = true;
+  if ($("bylaws-suggestions")) $("bylaws-suggestions").innerHTML = "";
+  if ($("bylaws-apply-status")) $("bylaws-apply-status").textContent = "";
+}
+
+function showBylawsScan(scan) {
+  bylawsScan = scan || null;
+  const box = $("bylaws-review");
+  if (!box) return;
+  box.hidden = false;
+  if ($("bylaws-apply-status")) $("bylaws-apply-status").textContent = "";
+  if ($("bylaws-scan-status")) $("bylaws-scan-status").textContent = (scan && scan.message) || "";
+  renderBylawsSuggestions();
+}
+
+function renderBylawsSuggestions() {
+  const list = $("bylaws-suggestions");
+  if (!list) return;
+  list.innerHTML = "";
+  const scan = bylawsScan || {};
+  const rows = []
+    .concat(scan.quorum || [])
+    .concat(scan.officers || [])
+    .concat(scan.customs || []);
+  if (!rows.length && scan.message) {
+    const li = document.createElement("li");
+    li.className = "hint";
+    li.textContent = "Use Open quorum rule or Open officers to enter them by hand.";
+    list.appendChild(li);
+    return;
+  }
+  rows.forEach((item, index) => {
+    const li = document.createElement("li");
+    const kind = document.createElement("span");
+    kind.className = "kind";
+    kind.textContent = item.kind === "custom" ? "Reminder" : "Suggestion";
+    li.appendChild(kind);
+    if (item.kind === "custom") {
+      const text = document.createElement("p");
+      text.textContent = item.text || "";
+      li.appendChild(text);
+    } else {
+      const row = document.createElement("label");
+      row.className = "check";
+      const boxEl = document.createElement("input");
+      boxEl.type = "checkbox";
+      boxEl.dataset.kind = item.kind;
+      boxEl.dataset.index = String(index);
+      boxEl.dataset.id = item.id || `${item.kind}-${index}`;
+      boxEl.checked = !item.would_overwrite;
+      const input = document.createElement(item.kind === "quorum" ? "textarea" : "input");
+      if (item.kind === "quorum") input.rows = 2;
+      input.value = item.text || item.title || "";
+      input.setAttribute("aria-label", item.kind === "quorum" ? "Quorum suggestion" : "Officer title");
+      input.oninput = () => {
+        item.text = input.value;
+        if (item.kind === "officer") item.title = input.value;
+      };
+      row.appendChild(boxEl);
+      row.appendChild(input);
+      li.appendChild(row);
+      if (item.would_overwrite) {
+        const overwrite = document.createElement("label");
+        overwrite.className = "check";
+        const overBox = document.createElement("input");
+        overBox.type = "checkbox";
+        overBox.dataset.overwrite = "1";
+        overwrite.appendChild(overBox);
+        overwrite.appendChild(document.createTextNode(" Replace the current value"));
+        li.appendChild(overwrite);
+        item._overwriteEl = overBox;
+      }
+      item._confirmEl = boxEl;
+    }
+    if (item.change) {
+      const change = document.createElement("p");
+      change.className = "change";
+      change.textContent = item.change;
+      li.appendChild(change);
+    }
+    list.appendChild(li);
+  });
+}
+
+function bindDocScanButtons(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-bylaws-scan]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!current || !current.id) return;
+      $("save-status").textContent = "Scanning on this device…";
+      try {
+        const data = await api("/api/bylaws/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            meeting_id: current.id,
+            filename: btn.getAttribute("data-bylaws-scan"),
+            label: btn.getAttribute("data-bylaws-label") || "bylaws",
+          }),
+        });
+        showBylawsScan(data.bylaws_scan);
+        $("save-status").textContent = (data.bylaws_scan && data.bylaws_scan.message) || "Scan finished";
+      } catch (e) {
+        $("save-status").textContent = e.message || "Could not scan document";
+      }
+    };
+  });
+}
+
 function renderDocuments() {
   const items = current && current.documents ? current.documents : [];
   const html = items.length
@@ -812,13 +929,19 @@ function renderDocuments() {
             ? `/api/meetings/${encodeURIComponent(current.id)}/documents/${encodeURIComponent(d.filename)}`
             : "#";
           const when = d.time ? ` · ${d.time}` : "";
-          return `<li><a href="${href}" target="_blank" rel="noopener">${d.label || "other"} · ${d.filename} · ${formatDocBytes(d.bytes)}${when}</a></li>`;
+          const scan = isRulesLabel(d.label)
+            ? ` <button type="button" data-bylaws-scan="${d.filename}" data-bylaws-label="${d.label || "bylaws"}">Scan</button>`
+            : "";
+          return `<li><a href="${href}" target="_blank" rel="noopener">${d.label || "other"} · ${d.filename} · ${formatDocBytes(d.bytes)}${when}</a>${scan}</li>`;
         })
         .join("")
     : `<li class="hint">No documents attached</li>`;
   ["doc-list", "doc-list-reports"].forEach((id) => {
     const el = $(id);
-    if (el) el.innerHTML = html;
+    if (el) {
+      el.innerHTML = html;
+      bindDocScanButtons(el);
+    }
   });
 }
 
@@ -1154,6 +1277,7 @@ async function addDocuments(fileList, label) {
   }
   $("save-status").textContent = "Saving document…";
   try {
+    let lastScan = null;
     for (const file of files) {
       const params = new URLSearchParams({
         label: label || "other",
@@ -1164,10 +1288,18 @@ async function addDocuments(fileList, label) {
         body: file,
       });
       current = data.meeting;
+      if (data.bylaws_scan) lastScan = data.bylaws_scan;
     }
     renderDocuments();
-    $("save-status").textContent =
-      files.length === 1 ? `Attached ${files[0].name || "document"}` : `Attached ${files.length} documents`;
+    if (lastScan) {
+      showBylawsScan(lastScan);
+      $("save-status").textContent = lastScan.found
+        ? "Suggestions ready — confirm before they fill the quorum rule or officers."
+        : lastScan.message || "Attached. No suggestions found.";
+    } else {
+      $("save-status").textContent =
+        files.length === 1 ? `Attached ${files[0].name || "document"}` : `Attached ${files.length} documents`;
+    }
   } catch (e) {
     $("save-status").textContent = e.message || "Could not save document";
   }
@@ -1564,6 +1696,84 @@ bindDocInput("doc-photo", "doc-label");
 bindDocInput("doc-file", "doc-label");
 bindDocInput("doc-camera-reports", "doc-label-reports");
 bindDocInput("doc-file-reports", "doc-label-reports");
+
+function collectBylawsConfirm() {
+  const scan = bylawsScan || {};
+  const quorumRows = scan.quorum || [];
+  const officerRows = scan.officers || [];
+  let quorum = null;
+  quorumRows.forEach((item) => {
+    if (!item._confirmEl || !item._confirmEl.checked || quorum) return;
+    quorum = {
+      confirm: true,
+      overwrite: !!(item._overwriteEl && item._overwriteEl.checked),
+      text: item.text || "",
+      rule: item.rule || null,
+    };
+  });
+  const officers = officerRows
+    .filter((item) => item._confirmEl && item._confirmEl.checked)
+    .map((item) => ({
+      confirm: true,
+      overwrite: !!(item._overwriteEl && item._overwriteEl.checked),
+      title: item.title || item.text || "",
+      text: item.text || item.title || "",
+    }));
+  return { quorum, officers };
+}
+
+async function confirmBylawsSelected() {
+  const status = $("bylaws-apply-status");
+  if (status) status.textContent = "";
+  const payload = collectBylawsConfirm();
+  if (!payload.quorum && !(payload.officers || []).length) {
+    if (status) status.textContent = "Select a quorum or officer suggestion to confirm.";
+    return;
+  }
+  try {
+    const data = await api("/api/bylaws/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    settings = data.settings || settings;
+    fillWizardQuorum(settings.quorum_rule);
+    officerDraft = rememberedOfficersFromSettings();
+    renderOfficerDraft();
+    refreshQuorumTitleChoices();
+    if (current) {
+      renderPeople();
+      persistAttendance();
+    }
+    const applied = (data.applied || []).length;
+    const skipped = (data.skipped || []).length;
+    const skipNotes = (data.skipped || [])
+      .map((row) => row.change || row.reason || "")
+      .filter(Boolean)
+      .join(" ");
+    if (status) {
+      status.textContent = applied
+        ? `Applied ${applied} item${applied === 1 ? "" : "s"}.${skipped ? ` ${skipNotes}` : ""}`
+        : skipNotes || "Nothing applied. Existing values were left unchanged.";
+    }
+    $("save-status").textContent = applied
+      ? "Confirmed suggestions filled the quorum rule and/or officers."
+      : "Nothing applied. Existing quorum rule and officers were left unchanged.";
+  } catch (e) {
+    if (status) status.textContent = e.message || "Could not confirm suggestions";
+  }
+}
+
+if ($("btn-bylaws-confirm")) $("btn-bylaws-confirm").onclick = () => confirmBylawsSelected();
+if ($("btn-bylaws-skip")) $("btn-bylaws-skip").onclick = hideBylawsReview;
+if ($("btn-bylaws-open-rule")) $("btn-bylaws-open-rule").onclick = openQuorumRuleEditor;
+if ($("btn-bylaws-open-officers")) {
+  $("btn-bylaws-open-officers").onclick = () => {
+    officerDraft = rememberedOfficersFromSettings();
+    renderOfficerDraft();
+    showOfficerSheet();
+  };
+}
 $("btn-email").onclick = async () => {
   await saveMeeting();
   const mail = await api(`/api/meetings/${current.id}/email`);
