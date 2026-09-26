@@ -95,6 +95,14 @@ def create_meeting(fields: dict[str, Any] | None = None) -> Meeting:
         fields["roster_titles"] = apply_officer_titles(fields.get("roster_titles") or {}, officers)
     fields.setdefault("roberts", bool(prefs.get("roberts", True)))
     fields.setdefault("minutes_closing", str(prefs.get("minutes_closing") or ""))
+    if "minutes_name_style" in prefs:
+        fields.setdefault("minutes_name_style", str(prefs.get("minutes_name_style") or ""))
+    if "minutes_motion_phrasing" in prefs:
+        fields.setdefault("minutes_motion_phrasing", str(prefs.get("minutes_motion_phrasing") or ""))
+    if "minutes_signature_shape" in prefs:
+        fields.setdefault("minutes_signature_shape", str(prefs.get("minutes_signature_shape") or ""))
+    if "minutes_heading_order" in prefs:
+        fields.setdefault("minutes_heading_order", list(prefs.get("minutes_heading_order") or []))
     fields.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     if "opening" not in fields:
         fields["opening"] = opening_for(str(prefs.get("template") or "sal"))
@@ -183,6 +191,14 @@ def save_meeting(meeting: Meeting) -> Meeting:
     prefs = app_settings.load_settings()
     if "minutes_closing" in prefs:
         meeting.minutes_closing = " ".join(str(prefs.get("minutes_closing") or "").split())
+    if "minutes_name_style" in prefs:
+        meeting.minutes_name_style = str(prefs.get("minutes_name_style") or "")
+    if "minutes_motion_phrasing" in prefs:
+        meeting.minutes_motion_phrasing = str(prefs.get("minutes_motion_phrasing") or "")
+    if "minutes_signature_shape" in prefs:
+        meeting.minutes_signature_shape = str(prefs.get("minutes_signature_shape") or "")
+    if "minutes_heading_order" in prefs:
+        meeting.minutes_heading_order = list(prefs.get("minutes_heading_order") or [])
     rule = normalize_quorum_rule(prefs.get("quorum_rule"))
     result = evaluate_quorum(rule, present_people_from(meeting.present, _titles_for(meeting, prefs)))
     apply_result_to_meeting(meeting, result)

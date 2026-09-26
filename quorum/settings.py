@@ -7,6 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from .config import vault_dir
+from .minutes import (
+    normalize_heading_order,
+    normalize_motion_phrasing,
+    normalize_name_style,
+    normalize_signature_shape,
+    parse_heading_keys,
+)
 from .officers import normalize_officers, officers_to_dicts
 from .quorum_rule import normalize_quorum_rule
 
@@ -53,6 +60,15 @@ def load_settings() -> dict[str, Any]:
         data["officers"] = officers_to_dicts(normalize_officers(data.get("officers")))
     if "minutes_closing" in data:
         data["minutes_closing"] = _clean_minutes_closing(data.get("minutes_closing"))
+    if "minutes_name_style" in data:
+        data["minutes_name_style"] = normalize_name_style(data.get("minutes_name_style"))
+    if "minutes_motion_phrasing" in data:
+        data["minutes_motion_phrasing"] = normalize_motion_phrasing(data.get("minutes_motion_phrasing"))
+    if "minutes_signature_shape" in data:
+        data["minutes_signature_shape"] = normalize_signature_shape(data.get("minutes_signature_shape"))
+    if "minutes_heading_order" in data:
+        keys = parse_heading_keys(data.get("minutes_heading_order"))
+        data["minutes_heading_order"] = keys or normalize_heading_order(data.get("minutes_heading_order"))
     return data
 
 
@@ -99,6 +115,15 @@ def save_settings(update: dict[str, Any]) -> dict[str, Any]:
         incoming["officers"] = officers_to_dicts(normalize_officers(incoming.get("officers")))
     if "minutes_closing" in incoming:
         incoming["minutes_closing"] = _clean_minutes_closing(incoming.get("minutes_closing"))
+    if "minutes_name_style" in incoming:
+        incoming["minutes_name_style"] = normalize_name_style(incoming.get("minutes_name_style"))
+    if "minutes_motion_phrasing" in incoming:
+        incoming["minutes_motion_phrasing"] = normalize_motion_phrasing(incoming.get("minutes_motion_phrasing"))
+    if "minutes_signature_shape" in incoming:
+        incoming["minutes_signature_shape"] = normalize_signature_shape(incoming.get("minutes_signature_shape"))
+    if "minutes_heading_order" in incoming:
+        keys = parse_heading_keys(incoming.get("minutes_heading_order"))
+        incoming["minutes_heading_order"] = keys or normalize_heading_order(incoming.get("minutes_heading_order"))
     data.update(incoming)
     if data.get("retention") not in RETENTION_CHOICES:
         raise ValueError("retention must be until_approved, 7d, 14d, or keep")
