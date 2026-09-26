@@ -76,6 +76,18 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
   color: var(--gold); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
 }
 #bylaws-suggestions .change { color: var(--muted); font-size: 0.8rem; }
+#bylaws-suggestions .rule-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+#bylaws-suggestions .rule-compare span {
+  color: var(--gold);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+#bylaws-suggestions .rule-compare p { margin: 0.2rem 0 0; font-size: 0.85rem; }
 #bylaws-suggestions .row.compact { margin: 0.15rem 0; }
 #prior-review {
   border: 1px solid var(--line); background: #0f0d0b; padding: 0.65rem 0.75rem; margin: 0.6rem 0;

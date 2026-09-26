@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -749,19 +751,43 @@ def email_payload(meeting: Meeting) -> dict[str, str]:
     return {"subject": subject, "body": body, "filename": f"{meeting.file_stem or meeting.id}-minutes.md"}
 
 
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _render_md_bold(text: str) -> str:
+    return _BOLD_RE.sub(r"<strong>\1</strong>", text).replace("**", "")
+
+
+def _minutes_md_to_html(md: str) -> str:
+    """Escape first, then render **bold** and simple '* ' bullets. Safe for print HTML only."""
+    escaped = html.escape(md or "", quote=False)
+    chunks: list[str] = []
+    index = 0
+    lines = escaped.split("\n")
+    while index < len(lines):
+        if lines[index].startswith("* "):
+            items: list[str] = []
+            while index < len(lines) and lines[index].startswith("* "):
+                items.append(f"<li>{_render_md_bold(lines[index][2:])}</li>")
+                index += 1
+            chunks.append("<ul>" + "".join(items) + "</ul>")
+            continue
+        chunks.append(_render_md_bold(lines[index]))
+        if index < len(lines) - 1:
+            chunks.append("<br/>")
+        index += 1
+    return "".join(chunks)
+
+
 def render_minutes_html(meeting: Meeting) -> str:
     """Printable HTML for the same minutes (email / paper / PDF via the browser)."""
     md = render_minutes(meeting)
-    escaped = (
-        md.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
-    title = f"{meeting.organization or 'Meeting'} minutes {meeting.date or ''}".strip()
+    body = _minutes_md_to_html(md)
+    title = html.escape(f"{meeting.organization or 'Meeting'} minutes {meeting.date or ''}".strip())
     return (
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"/>"
         f"<title>{title}</title>"
         "<style>body{font:16px/1.45 Georgia,serif;max-width:40rem;margin:2rem auto;padding:0 1rem}"
-        "pre{white-space:pre-wrap;font:inherit}</style></head><body>"
-        f"<pre>{escaped}</pre></body></html>\n"
+        "ul{margin:0.35rem 0 0.35rem 1.25rem;padding:0}</style></head><body>"
+        f"{body}</body></html>\n"
     )
