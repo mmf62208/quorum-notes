@@ -5,7 +5,7 @@ Draft / HOLD. Do not merge.
 - **PR:** https://github.com/mmf62208/quorum-notes/pull/7
 - **Branch:** `cursor/minutes-house-style-6d76`
 - **Base:** `main` (`12e0c11`)
-- **Head:** `fba801f560274abadcf6e88663d4adc1a853d631`
+- **Head:** `57b153b203cb41ee4571cbb765f7b436200d8b46` (plus this status SHA fix on the same branch)
 - **Tests:** `python3 -m unittest discover -s tests -v` — **125 passed** (108 existing + 17 new). 0 failed.
 - **Browser:** Setup closing-line field + a full Sep-22-shaped draft were clicked through. Record stayed available.
 - **Screenshots (not committed):**
