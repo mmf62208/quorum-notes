@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 from quorum import bylaws, config, settings as app_settings, vault
 from quorum.minutes import normalize_doc_label
+from quorum.quorum_rule import SAL_POST_484_RULE
 from quorum.server import Handler
 from quorum.settings import DEFAULTS
 
@@ -25,6 +26,13 @@ INDEX = (WEB / "index.html").read_text(encoding="utf-8")
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "bylaws"
 BYLAWS_TXT = (FIXTURES / "cedar_grove_squadron_9.txt").read_text(encoding="utf-8")
 BYLAWS_PDF = (FIXTURES / "cedar_grove_squadron_9.pdf").read_bytes()
+SAL_484_TXT = (FIXTURES / "sal_post_484_quorum.txt").read_text(encoding="utf-8")
+SAL_484_SENTENCE = " ".join(SAL_484_TXT.split()).strip()
+SAL_484_VARIANTS = (
+    SAL_484_SENTENCE,
+    "A quorum shall consist of the Commander, or the 1st/2nd Vice Commander presiding, and at least 3 other officers.",
+    "A quorum shall consist of the Commander, or the First or Second Vice Commander presiding, and at least three other officers.",
+)
 BAD_SCAN = (FIXTURES / "bad_scan.jpg").read_bytes()
 OLD_SETTINGS = Path(__file__).resolve().parent / "fixtures" / "old_settings.json"
 
@@ -98,6 +106,19 @@ class BylawsExtractTests(unittest.TestCase):
         self.assertGreaterEqual(len(rule.presiding_any_of), 1)
         self.assertEqual(rule.min_other_officers, 3)
         self.assertEqual(rule.notes, sentence)
+
+    def test_sal_484_sentence_matches_saved_presiding_and_count(self):
+        for sentence in SAL_484_VARIANTS:
+            with self.subTest(sentence=sentence):
+                rule = bylaws.suggested_quorum_rule(sentence)
+                self.assertEqual(rule.mode, "structured")
+                self.assertEqual(set(rule.presiding_any_of), set(SAL_POST_484_RULE.presiding_any_of))
+                self.assertEqual(rule.min_other_officers, SAL_POST_484_RULE.min_other_officers)
+                self.assertEqual(rule.min_other_officers, 3)
+                self.assertEqual(
+                    list(rule.presiding_any_of),
+                    ["Commander", "1st Vice Commander", "2nd Vice Commander"],
+                )
 
     def test_bad_scan_finds_nothing(self):
         scan = bylaws.scan_bytes(BAD_SCAN, filename="bad_scan.jpg", label="bylaws")
@@ -203,6 +224,73 @@ class BylawsApplyTests(unittest.TestCase):
         self.assertTrue(all(row["readonly"] for row in scan.customs))
         plan = bylaws.plan_apply({"quorum_rule": {"mode": "none"}}, {"customs": scan.customs})
         self.assertEqual(plan.update, {})
+
+    def test_first_time_and_identical_quorum_stay_default_selected(self):
+        first = bylaws.scan_text(SAL_484_SENTENCE, settings={"quorum_rule": {"mode": "none"}})
+        self.assertTrue(first.quorum)
+        self.assertFalse(first.quorum[0]["would_overwrite"])
+        self.assertFalse(first.quorum[0]["weakens"])
+        self.assertTrue(first.quorum[0]["default_selected"])
+        self.assertEqual(first.quorum[0]["current"], "")
+        self.assertTrue(first.quorum[0]["proposed"])
+
+        same = bylaws.scan_text(SAL_484_SENTENCE, settings={"quorum_rule": SAL_POST_484_RULE.to_dict()})
+        self.assertTrue(same.quorum[0]["would_overwrite"])
+        self.assertFalse(same.quorum[0]["weakens"])
+        self.assertTrue(same.quorum[0]["default_selected"])
+        self.assertTrue(same.quorum[0]["current"])
+        self.assertTrue(same.quorum[0]["proposed"])
+
+    def test_stronger_quorum_stays_default_selected(self):
+        settings = {
+            "quorum_rule": {
+                "mode": "structured",
+                "presiding_any_of": ["Commander"],
+                "min_other_officers": 3,
+            }
+        }
+        scan = bylaws.scan_text(SAL_484_SENTENCE, settings=settings)
+        self.assertFalse(scan.quorum[0]["weakens"])
+        self.assertTrue(scan.quorum[0]["default_selected"])
+
+    def test_weaken_or_replace_quorum_starts_unselected(self):
+        saved = {"quorum_rule": SAL_POST_484_RULE.to_dict()}
+        weaker = bylaws.scan_text(
+            "A quorum shall consist of the Commander and two other officers.",
+            settings=saved,
+        )
+        self.assertTrue(weaker.quorum[0]["would_overwrite"])
+        self.assertTrue(weaker.quorum[0]["weakens"])
+        self.assertFalse(weaker.quorum[0]["default_selected"])
+        self.assertIn("Commander or 1st/2nd Vice", weaker.quorum[0]["current"])
+        self.assertTrue(weaker.quorum[0]["proposed"])
+        self.assertNotEqual(weaker.quorum[0]["current"], weaker.quorum[0]["proposed"])
+
+        as_text = bylaws.scan_text("A quorum shall consist of whoever is present.", settings=saved)
+        self.assertEqual(as_text.quorum[0]["rule"]["mode"], "text")
+        self.assertTrue(as_text.quorum[0]["weakens"])
+        self.assertFalse(as_text.quorum[0]["default_selected"])
+
+        missing_count = bylaws.scan_text(
+            "A quorum shall consist of the Commander, 1st Vice Commander, or 2nd Vice Commander.",
+            settings=saved,
+        )
+        self.assertTrue(missing_count.quorum[0]["weakens"])
+        self.assertFalse(missing_count.quorum[0]["default_selected"])
+
+    def test_confirm_applies_only_ticked_quorum(self):
+        settings = {"quorum_rule": SAL_POST_484_RULE.to_dict()}
+        weaker = "A quorum shall consist of the Commander and two other officers."
+        skipped = bylaws.plan_apply(
+            settings,
+            {"quorum": {"confirm": False, "overwrite": True, "text": weaker}},
+        )
+        self.assertEqual(skipped.update, {})
+        applied = bylaws.plan_apply(
+            settings,
+            {"quorum": {"confirm": True, "overwrite": True, "text": weaker}},
+        )
+        self.assertEqual(applied.update["quorum_rule"]["min_other_officers"], 2)
 
 
 class BylawsVaultHttpTests(unittest.TestCase):
@@ -426,6 +514,15 @@ class BylawsUiContractTests(unittest.TestCase):
         confirm = _fn(APP_JS, "confirmBylawsSelected")
         self.assertIn("/api/bylaws/confirm", confirm)
         self.assertIn("fillWizardQuorum", confirm)
+        render_at = APP_JS.index("function renderBylawsSuggestions")
+        render = APP_JS[render_at : APP_JS.index("function hidePriorReview")]
+        self.assertIn("default_selected", render)
+        self.assertIn("rule-compare", render)
+        self.assertIn("item.current", render)
+        self.assertIn("item.proposed", render)
+        collect_at = APP_JS.index("function collectBylawsConfirm")
+        collect = APP_JS[collect_at : APP_JS.index("async function confirmBylawsSelected")]
+        self.assertIn("_confirmEl.checked", collect)
 
     def test_doc_label_normalizes_rules(self):
         self.assertEqual(normalize_doc_label("Bylaws"), "bylaws")

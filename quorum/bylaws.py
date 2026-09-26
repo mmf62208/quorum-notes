@@ -44,12 +44,18 @@ _NUMBER_WORDS = {
     "ten": 10,
 }
 _NUMBER_RE = "|".join(list(_NUMBER_WORDS) + [r"\d+"])
+_PAREN_COUNT = r"(?:\s*\(\s*\d+\s*\))?"
 _OTHER_OFFICERS_RE = re.compile(
-    rf"(?:at\s+least\s+)?({_NUMBER_RE})\s+(?:other\s+)?officers?",
+    rf"(?:at\s+least\s+)?({_NUMBER_RE}){_PAREN_COUNT}\s+(?:other\s+)?officers?",
     re.I,
 )
 _MEMBERS_RE = re.compile(
-    rf"(?:at\s+least\s+)?({_NUMBER_RE})\s+members?",
+    rf"(?:at\s+least\s+)?({_NUMBER_RE}){_PAREN_COUNT}\s+members?",
+    re.I,
+)
+_VICE_ORDINAL = r"(?:1st|2nd|first|second)"
+_VICE_LIST_RE = re.compile(
+    rf"\b({_VICE_ORDINAL}(?:\s*(?:/|or|,)\s*{_VICE_ORDINAL})+)\s+vice(?:\s+commander)?\b",
     re.I,
 )
 
@@ -299,10 +305,20 @@ def extract_quorum_sentences(text: str) -> list[str]:
     return out
 
 
+def _expand_vice_lists(text: str) -> str:
+    """Turn '1st or 2nd Vice' / '1st/2nd Vice' / 'First or Second Vice Commander' into full titles."""
+
+    def repl(match: re.Match[str]) -> str:
+        ordinals = re.findall(r"1st|2nd|first|second", match.group(1), flags=re.I)
+        return " or ".join(f"{item} Vice Commander" for item in ordinals)
+
+    return _VICE_LIST_RE.sub(repl, text or "")
+
+
 def extract_officer_titles(text: str) -> list[str]:
     found: list[str] = []
     seen: set[str] = set()
-    body = text or ""
+    body = _expand_vice_lists(text or "")
     for match in _TITLE_FIND.finditer(body):
         display = display_title(match.group(1))
         key = normalize_title(display)
@@ -338,6 +354,7 @@ def _parse_count(raw: str) -> int | None:
     folded = (raw or "").strip().casefold()
     if not folded:
         return None
+    folded = re.sub(r"\s*\(\s*\d+\s*\)\s*", " ", folded).strip()
     if folded.isdigit():
         number = int(folded)
         return number if number > 0 else None
@@ -381,10 +398,81 @@ def _existing_officer(settings: dict[str, Any] | None, title: str) -> Officer | 
     return None
 
 
+def _presiding_keys(rule: QuorumRule) -> frozenset[str]:
+    return frozenset(normalize_title(title) for title in rule.presiding_any_of if title)
+
+
+def _count_missing_or_lower(current: int | None, proposed: int | None) -> bool:
+    if current is None:
+        return False
+    if proposed is None:
+        return True
+    return proposed < current
+
+
+def quorum_suggestion_weakens(current: QuorumRule, proposed: QuorumRule) -> bool:
+    """True when proposed covers fewer titles, lowers/drops a count, or drops structured mode."""
+    if current.mode == "none":
+        return False
+    if current.mode == "structured" and proposed.mode != "structured":
+        return True
+    if current.mode == "text" and proposed.mode == "none":
+        return True
+    if current.mode != "structured" or proposed.mode != "structured":
+        return False
+    cur_titles = _presiding_keys(current)
+    new_titles = _presiding_keys(proposed)
+    if len(new_titles) < len(cur_titles):
+        return True
+    if _count_missing_or_lower(current.min_other_officers, proposed.min_other_officers):
+        return True
+    if _count_missing_or_lower(current.min_members_total, proposed.min_members_total):
+        return True
+    return False
+
+
+def quorum_suggestion_identical(current: QuorumRule, proposed: QuorumRule) -> bool:
+    if current.mode != proposed.mode:
+        return False
+    if current.mode in ("none", "text"):
+        return True if current.mode == "none" else (current.notes or "").strip() == (proposed.notes or "").strip()
+    return (
+        _presiding_keys(current) == _presiding_keys(proposed)
+        and current.min_other_officers == proposed.min_other_officers
+        and current.min_members_total == proposed.min_members_total
+    )
+
+
+def quorum_suggestion_stronger(current: QuorumRule, proposed: QuorumRule) -> bool:
+    if current.mode == "none" or quorum_suggestion_weakens(current, proposed):
+        return False
+    if proposed.mode == "structured" and current.mode != "structured":
+        return True
+    if current.mode != "structured" or proposed.mode != "structured":
+        return False
+    more_titles = _presiding_keys(proposed) > _presiding_keys(current)
+    more_officers = proposed.min_other_officers is not None and (
+        current.min_other_officers is None or proposed.min_other_officers > current.min_other_officers
+    )
+    more_members = proposed.min_members_total is not None and (
+        current.min_members_total is None or proposed.min_members_total > current.min_members_total
+    )
+    return bool(more_titles or more_officers or more_members)
+
+
+def quorum_default_selected(current: QuorumRule, proposed: QuorumRule) -> bool:
+    if current.mode == "none":
+        return True
+    if quorum_suggestion_identical(current, proposed):
+        return True
+    return quorum_suggestion_stronger(current, proposed)
+
+
 def _quorum_item(index: int, sentence: str, settings: dict[str, Any] | None) -> dict[str, Any]:
     current = normalize_quorum_rule((settings or {}).get("quorum_rule"))
     rule = suggested_quorum_rule(sentence)
     overwrite = current.mode != "none"
+    weakens = quorum_suggestion_weakens(current, rule)
     return {
         "id": f"quorum-{index}",
         "kind": "quorum",
@@ -392,6 +480,8 @@ def _quorum_item(index: int, sentence: str, settings: dict[str, Any] | None) -> 
         "rule": rule.to_dict(),
         "readonly": False,
         "would_overwrite": overwrite,
+        "weakens": weakens,
+        "default_selected": quorum_default_selected(current, rule),
         "current": preview_rule(current) if overwrite else "",
         "proposed": preview_rule(rule),
         "change": (

@@ -888,7 +888,9 @@ function renderBylawsSuggestions() {
       boxEl.dataset.kind = item.kind;
       boxEl.dataset.index = String(index);
       boxEl.dataset.id = item.id || `${item.kind}-${index}`;
-      boxEl.checked = !item.would_overwrite;
+      boxEl.checked = item.kind === "quorum" && "default_selected" in item
+        ? !!item.default_selected
+        : !item.would_overwrite;
       const input = document.createElement(item.kind === "quorum" ? "textarea" : "input");
       if (item.kind === "quorum") input.rows = 2;
       input.value = item.text || item.title || "";
@@ -912,6 +914,29 @@ function renderBylawsSuggestions() {
         item._overwriteEl = overBox;
       }
       item._confirmEl = boxEl;
+    }
+    if (item.kind === "quorum" && (item.current || item.proposed)) {
+      const compare = document.createElement("div");
+      compare.className = "rule-compare";
+      const currentBox = document.createElement("div");
+      currentBox.className = "rule-current";
+      const currentLabel = document.createElement("span");
+      currentLabel.textContent = "Current";
+      const currentVal = document.createElement("p");
+      currentVal.textContent = item.current || "(none)";
+      currentBox.appendChild(currentLabel);
+      currentBox.appendChild(currentVal);
+      const proposedBox = document.createElement("div");
+      proposedBox.className = "rule-proposed";
+      const proposedLabel = document.createElement("span");
+      proposedLabel.textContent = "Proposed";
+      const proposedVal = document.createElement("p");
+      proposedVal.textContent = item.proposed || "";
+      proposedBox.appendChild(proposedLabel);
+      proposedBox.appendChild(proposedVal);
+      compare.appendChild(currentBox);
+      compare.appendChild(proposedBox);
+      li.appendChild(compare);
     }
     if (item.change) {
       const change = document.createElement("p");

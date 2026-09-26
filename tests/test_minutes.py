@@ -97,6 +97,36 @@ class MinutesTests(unittest.TestCase):
         mail = email_payload(meeting)
         self.assertEqual(mail["body"], text)
 
+    def test_print_html_renders_bold_and_escapes(self):
+        meeting = Meeting(
+            id="print-html",
+            organization="A <B> Post",
+            date="2026-09-26",
+            title="Regular Meeting",
+            opening=["Pledge of Allegiance"],
+            present=["Pat Hale"],
+            roster=["Pat Hale"],
+            reports=[Report(title="Finance", presenter="Ted", body="Cash on hand < 100")],
+            submitted_by="Pat Hale",
+            submitted_office="Adjutant",
+        )
+        text = render_minutes(meeting)
+        self.assertIn("**", text)
+        self.assertIn("< 100", text)
+        self.assertIn("* ", text)
+        html = render_minutes_html(meeting)
+        self.assertNotIn("**", html)
+        self.assertIn("<strong>", html)
+        self.assertIn("</strong>", html)
+        self.assertIn("&lt;", html)
+        self.assertNotIn("< 100", html)
+        self.assertIn("<ul>", html)
+        self.assertIn("<li>", html)
+        mail = email_payload(meeting)
+        self.assertEqual(mail["body"], text)
+        self.assertIn("**", mail["body"])
+        self.assertIn("< 100", mail["body"])
+
 
 if __name__ == "__main__":
     unittest.main()
