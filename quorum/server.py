@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import ai, backup, bylaws, config, demo, roster, settings as app_settings, signin, vault
+from . import ai, backup, bylaws, config, demo, prior_minutes, roster, settings as app_settings, signin, vault
 from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
 from .officers import apply_officer_titles, resolve_officers
@@ -256,12 +256,21 @@ class Handler(BaseHTTPRequestHandler):
                     "bytes": item.bytes,
                     "time": item.time,
                 }
+                prefs = app_settings.load_settings()
                 if bylaws.is_rules_label(item.label):
                     payload["bylaws_scan"] = bylaws.scan_bytes(
                         data,
                         filename=item.filename,
                         label=item.label,
-                        settings=app_settings.load_settings(),
+                        settings=prefs,
+                    ).to_dict()
+                if prior_minutes.is_prior_minutes_label(item.label):
+                    payload["prior_minutes_scan"] = prior_minutes.scan_bytes(
+                        data,
+                        filename=item.filename,
+                        label=item.label,
+                        settings=prefs,
+                        meeting=meeting,
                     ).to_dict()
                 return _json(self, 200, payload)
             if path == "/api/bylaws/scan":
@@ -293,6 +302,74 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return _json(self, 200, {"bylaws_scan": scan.to_dict()})
                 return _json(self, 400, {"error": "need text or meeting_id and filename"})
+            if path == "/api/prior-minutes/scan":
+                body = _read_json(self) or {}
+                prefs = app_settings.load_settings()
+                meeting = None
+                if body.get("meeting_id"):
+                    try:
+                        meeting = vault.load_meeting(str(body.get("meeting_id")))
+                    except (FileNotFoundError, ValueError):
+                        meeting = None
+                if "text" in body:
+                    scan = prior_minutes.scan_text(
+                        str(body.get("text") or ""),
+                        filename=str(body.get("filename") or "prior-minutes.txt"),
+                        label=str(body.get("label") or "prior_minutes"),
+                        settings=prefs,
+                        meeting=meeting,
+                    )
+                    return _json(self, 200, {"prior_minutes_scan": scan.to_dict()})
+                if body.get("meeting_id") and body.get("filename"):
+                    dest = vault.document_path(str(body.get("meeting_id")), str(body.get("filename")))
+                    if not dest.is_file():
+                        return _json(self, 404, {"error": "not found"})
+                    stored_label = "prior_minutes"
+                    if meeting:
+                        for item in meeting.documents:
+                            if item.filename == dest.name:
+                                stored_label = item.label
+                                break
+                    scan = prior_minutes.scan_bytes(
+                        dest.read_bytes(),
+                        filename=dest.name,
+                        label=str(body.get("label") or stored_label),
+                        settings=prefs,
+                        meeting=meeting,
+                    )
+                    return _json(self, 200, {"prior_minutes_scan": scan.to_dict()})
+                return _json(self, 400, {"error": "need text or meeting_id and filename"})
+            if path == "/api/prior-minutes/preview":
+                body = _read_json(self) or {}
+                prefs = app_settings.load_settings()
+                meeting = None
+                if body.get("meeting_id"):
+                    try:
+                        meeting = vault.load_meeting(str(body.get("meeting_id")))
+                    except (FileNotFoundError, ValueError):
+                        meeting = None
+                preview = prior_minutes.preview_from_payload(prefs, body, meeting)
+                return _json(self, 200, {"preview": preview})
+            if path == "/api/prior-minutes/confirm":
+                body = _read_json(self) or {}
+                meeting = None
+                if body.get("meeting_id"):
+                    try:
+                        meeting = vault.load_meeting(str(body.get("meeting_id")))
+                    except (FileNotFoundError, ValueError):
+                        meeting = None
+                plan = prior_minutes.apply_confirmed(app_settings.load_settings(), body, meeting)
+                payload = {
+                    "settings": plan.settings,
+                    "applied": plan.applied,
+                    "skipped": plan.skipped,
+                    "old_business": plan.old_business,
+                }
+                if plan.meeting is not None:
+                    payload["meeting"] = plan.meeting.to_dict()
+                    payload["markdown"] = render_minutes(plan.meeting)
+                    payload["agenda"] = agenda_status(plan.meeting)
+                return _json(self, 200, payload)
             if path == "/api/bylaws/confirm":
                 body = _read_json(self) or {}
                 plan = bylaws.apply_confirmed(app_settings.load_settings(), body)

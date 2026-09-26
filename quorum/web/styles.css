@@ -77,6 +77,27 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
 }
 #bylaws-suggestions .change { color: var(--muted); font-size: 0.8rem; }
 #bylaws-suggestions .row.compact { margin: 0.15rem 0; }
+#prior-review {
+  border: 1px solid var(--line); background: #0f0d0b; padding: 0.65rem 0.75rem; margin: 0.6rem 0;
+}
+#prior-suggestions { list-style: none; padding: 0; margin: 0.35rem 0; }
+#prior-suggestions li {
+  display: flex; flex-direction: column; gap: 0.25rem;
+  border-top: 1px solid var(--line); padding: 0.45rem 0;
+}
+#prior-suggestions .kind {
+  color: var(--gold); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+}
+#prior-suggestions .change { color: var(--muted); font-size: 0.8rem; }
+#prior-preview pre {
+  max-height: 14rem; overflow: auto; font-size: 0.8rem; margin: 0.2rem 0 0.6rem;
+}
+.prior-preview-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
+}
+@media (max-width: 840px) {
+  .prior-preview-grid { grid-template-columns: 1fr; }
+}
 .file-btn { background: #2a241c; border: 1px solid var(--line); padding: 0.45rem 0.6rem; color: var(--ink); cursor: pointer; }
 .hint { color: var(--muted); font-size: 0.85rem; }
 .quorum-out { font-weight: 700; }

@@ -72,9 +72,27 @@
         </div>
       </section>
       <section id="wiz-minutes-style" class="wiz-quorum">
-        <h2>Minutes closing line</h2>
-        <p class="hint">Optional. Printed under the signature. Leave blank for none.</p>
-        <label>Closing line
+        <h2>Minutes house style</h2>
+        <p class="hint">Optional. These change how minutes render. Leave blank-style defaults for the C1 house style.</p>
+        <label>Names in motions
+          <select id="wiz-minutes-name-style">
+            <option value="first">First names when unique</option>
+            <option value="full">Full names</option>
+          </select>
+        </label>
+        <label>Motion phrasing
+          <select id="wiz-minutes-motion">
+            <option value="moved_seconded">X moved …; Y seconded</option>
+            <option value="motion_by">Motion by X, seconded by Y</option>
+          </select>
+        </label>
+        <label>Signature block
+          <select id="wiz-minutes-signature">
+            <option value="respectfully">Respectfully submitted</option>
+            <option value="submitted_by_line">Submitted by Name, Office</option>
+          </select>
+        </label>
+        <label>Minutes closing line
           <input id="wiz-minutes-closing" placeholder="Optional closing line" />
         </label>
         <button type="button" id="btn-wiz-closing-sal">Use example: For God and Country</button>
@@ -174,6 +192,31 @@
         </div>
         <p id="bylaws-apply-status" class="hint"></p>
       </section>
+      <section id="prior-review" hidden>
+        <h3>Prior minutes style suggestions</h3>
+        <p class="hint">Confirm or edit each item. Nothing is applied until you confirm. Old Business items are not added until you confirm.</p>
+        <p id="prior-scan-status" class="hint"></p>
+        <ul id="prior-suggestions"></ul>
+        <div id="prior-preview" hidden>
+          <h3>Minutes preview</h3>
+          <div class="prior-preview-grid">
+            <div>
+              <p class="hint">Before</p>
+              <pre id="prior-preview-before"></pre>
+            </div>
+            <div>
+              <p class="hint">After</p>
+              <pre id="prior-preview-after"></pre>
+            </div>
+          </div>
+        </div>
+        <div class="row compact">
+          <button type="button" class="primary" id="btn-prior-confirm">Confirm selected</button>
+          <button type="button" id="btn-prior-skip">Skip</button>
+          <button type="button" id="btn-prior-open-style">Open minutes style</button>
+        </div>
+        <p id="prior-apply-status" class="hint"></p>
+      </section>
       <nav id="agenda" class="chips agenda"></nav>
       <div class="row compact">
         <button type="button" id="btn-prev-step">Back</button>
@@ -213,6 +256,7 @@
             <option value="handout">Handout</option>
             <option value="bylaws">Bylaws</option>
             <option value="standing_rules">Standing rules</option>
+            <option value="prior_minutes">Last accepted minutes</option>
             <option value="other" selected>Other</option>
           </select>
         </label>
@@ -250,6 +294,16 @@
           <button type="button" id="btn-prev-skip">Dispense with reading</button>
         </div>
         <input id="previous_minutes_note" placeholder="Correction note (optional)" />
+        <h3>Last accepted minutes</h3>
+        <p class="hint">Optional. Upload a photo, PDF, or text of the last accepted minutes. Suggestions pre-fill house style and Old Business only after you confirm.</p>
+        <div class="row compact">
+          <label class="file-btn">Photo of last minutes
+            <input type="file" id="doc-photo-prior" accept="image/*" capture="environment" multiple hidden />
+          </label>
+          <label class="file-btn">Attach last minutes
+            <input type="file" id="doc-file-prior" multiple hidden />
+          </label>
+        </div>
       </div>
 
       <div id="step-reports" class="step-panel" hidden>
@@ -270,6 +324,7 @@
               <option value="handout">Handout</option>
               <option value="bylaws">Bylaws</option>
               <option value="standing_rules">Standing rules</option>
+              <option value="prior_minutes">Last accepted minutes</option>
               <option value="other">Other</option>
             </select>
           </label>

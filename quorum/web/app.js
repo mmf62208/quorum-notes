@@ -275,6 +275,30 @@ function applySal484Closing() {
   if ($("wiz-minutes-closing")) $("wiz-minutes-closing").value = SAL_484_CLOSING;
 }
 
+function fillWizardMinutesStyle(prefs) {
+  const data = prefs || settings || {};
+  if ($("wiz-minutes-closing")) $("wiz-minutes-closing").value = data.minutes_closing || "";
+  if ($("wiz-minutes-name-style")) $("wiz-minutes-name-style").value = data.minutes_name_style || "first";
+  if ($("wiz-minutes-motion")) $("wiz-minutes-motion").value = data.minutes_motion_phrasing || "moved_seconded";
+  if ($("wiz-minutes-signature")) $("wiz-minutes-signature").value = data.minutes_signature_shape || "respectfully";
+}
+
+function readWizardMinutesStyle() {
+  return {
+    minutes_closing: ($("wiz-minutes-closing") && $("wiz-minutes-closing").value.trim()) || "",
+    minutes_name_style: ($("wiz-minutes-name-style") && $("wiz-minutes-name-style").value) || "first",
+    minutes_motion_phrasing: ($("wiz-minutes-motion") && $("wiz-minutes-motion").value) || "moved_seconded",
+    minutes_signature_shape: ($("wiz-minutes-signature") && $("wiz-minutes-signature").value) || "respectfully",
+    minutes_heading_order: (settings && settings.minutes_heading_order) || [],
+  };
+}
+
+function openMinutesStyleEditor() {
+  showWizard(true);
+  const section = $("wiz-minutes-style");
+  if (section && section.scrollIntoView) section.scrollIntoView({ block: "start" });
+}
+
 function applySal484Example() {
   document.querySelectorAll('input[name="wiz-quorum-mode"]').forEach((el) => {
     el.checked = el.value === "structured";
@@ -807,6 +831,10 @@ function isRulesLabel(label) {
   return label === "bylaws" || label === "standing_rules";
 }
 
+function isPriorMinutesLabel(label) {
+  return label === "prior_minutes" || label === "minutes" || label === "previous_minutes";
+}
+
 let bylawsScan = null;
 
 function hideBylawsReview() {
@@ -895,6 +923,177 @@ function renderBylawsSuggestions() {
   });
 }
 
+let priorScan = null;
+
+function hidePriorReview() {
+  priorScan = null;
+  if ($("prior-review")) $("prior-review").hidden = true;
+  if ($("prior-suggestions")) $("prior-suggestions").innerHTML = "";
+  if ($("prior-apply-status")) $("prior-apply-status").textContent = "";
+  if ($("prior-preview")) $("prior-preview").hidden = true;
+}
+
+function showPriorPreview(preview) {
+  const box = $("prior-preview");
+  if (!box) return;
+  const before = (preview && preview.before) || "";
+  const after = (preview && preview.after) || "";
+  if ($("prior-preview-before")) $("prior-preview-before").textContent = before;
+  if ($("prior-preview-after")) $("prior-preview-after").textContent = after;
+  box.hidden = !before && !after;
+}
+
+function showPriorScan(scan) {
+  priorScan = scan || null;
+  const box = $("prior-review");
+  if (!box) return;
+  box.hidden = false;
+  if ($("prior-apply-status")) $("prior-apply-status").textContent = "";
+  if ($("prior-scan-status")) $("prior-scan-status").textContent = (scan && scan.message) || "";
+  renderPriorSuggestions();
+  showPriorPreview(scan && scan.preview);
+}
+
+function renderPriorSuggestions() {
+  const list = $("prior-suggestions");
+  if (!list) return;
+  list.innerHTML = "";
+  const scan = priorScan || {};
+  const rows = [].concat(scan.style || []).concat(scan.old_business || []);
+  if (!rows.length && scan.message) {
+    const li = document.createElement("li");
+    li.className = "hint";
+    li.textContent = "Use Open minutes style to enter house style by hand.";
+    list.appendChild(li);
+    return;
+  }
+  rows.forEach((item, index) => {
+    const li = document.createElement("li");
+    const kind = document.createElement("span");
+    kind.className = "kind";
+    kind.textContent = item.kind === "old_business" ? "Carry old business" : "Suggestion";
+    li.appendChild(kind);
+    const row = document.createElement("label");
+    row.className = "check";
+    const boxEl = document.createElement("input");
+    boxEl.type = "checkbox";
+    boxEl.dataset.kind = item.kind;
+    boxEl.dataset.index = String(index);
+    boxEl.dataset.id = item.id || `${item.kind}-${index}`;
+    boxEl.checked = true;
+    boxEl.onchange = () => refreshPriorPreview();
+    const input = document.createElement("input");
+    input.value = item.proposed || item.text || "";
+    input.setAttribute("aria-label", item.label || item.kind || "Suggestion");
+    input.oninput = () => {
+      item.text = input.value;
+      if (item.kind === "style" && item.field !== "minutes_heading_order") item.value = input.value;
+      if (item.kind === "old_business") item.value = input.value;
+      refreshPriorPreview();
+    };
+    row.appendChild(boxEl);
+    row.appendChild(input);
+    li.appendChild(row);
+    if (item.would_overwrite) {
+      const overwrite = document.createElement("label");
+      overwrite.className = "check";
+      const overBox = document.createElement("input");
+      overBox.type = "checkbox";
+      overBox.dataset.overwrite = "1";
+      overwrite.appendChild(overBox);
+      overwrite.appendChild(document.createTextNode(" Replace the current value"));
+      li.appendChild(overwrite);
+      item._overwriteEl = overBox;
+    }
+    item._confirmEl = boxEl;
+    if (item.change) {
+      const change = document.createElement("p");
+      change.className = "change";
+      change.textContent = item.change;
+      li.appendChild(change);
+    }
+    list.appendChild(li);
+  });
+}
+
+function collectPriorConfirm() {
+  const scan = priorScan || {};
+  const style = (scan.style || [])
+    .filter((item) => item._confirmEl && item._confirmEl.checked)
+    .map((item) => ({
+      confirm: true,
+      overwrite: !!(item._overwriteEl && item._overwriteEl.checked),
+      field: item.field || "",
+      text: item.text || "",
+      value: item.value,
+    }));
+  const oldBusiness = (scan.old_business || [])
+    .filter((item) => item._confirmEl && item._confirmEl.checked)
+    .map((item) => ({
+      confirm: true,
+      text: item.text || item.value || "",
+    }));
+  return { style, old_business: oldBusiness };
+}
+
+const refreshPriorPreview = debounce(async () => {
+  if (!priorScan) return;
+  const payload = collectPriorConfirm();
+  payload.meeting_id = current && current.id;
+  try {
+    const data = await api("/api/prior-minutes/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    showPriorPreview(data.preview);
+  } catch (_e) {
+    showPriorPreview(priorScan.preview);
+  }
+}, 200);
+
+async function confirmPriorSelected() {
+  const status = $("prior-apply-status");
+  if (status) status.textContent = "";
+  const payload = collectPriorConfirm();
+  if (!(payload.style || []).length && !(payload.old_business || []).length) {
+    if (status) status.textContent = "Select a style or Old Business suggestion to confirm.";
+    return;
+  }
+  payload.meeting_id = current && current.id;
+  try {
+    const data = await api("/api/prior-minutes/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    settings = data.settings || settings;
+    fillWizardMinutesStyle(settings);
+    if (data.meeting) {
+      current = data.meeting;
+      fillHeader();
+      if ($("minutes") && data.markdown) $("minutes").textContent = data.markdown;
+      renderLists();
+    }
+    const applied = (data.applied || []).length;
+    const skipped = (data.skipped || []).length;
+    const skipNotes = (data.skipped || [])
+      .map((row) => row.change || row.reason || "")
+      .filter(Boolean)
+      .join(" ");
+    if (status) {
+      status.textContent = applied
+        ? `Applied ${applied} item${applied === 1 ? "" : "s"}.${skipped ? ` ${skipNotes}` : ""}`
+        : skipNotes || "Nothing applied. Existing values were left unchanged.";
+    }
+    $("save-status").textContent = applied
+      ? "Confirmed suggestions updated the minutes style and/or Old Business."
+      : "Nothing applied. Existing minutes style and Old Business were left unchanged.";
+  } catch (e) {
+    if (status) status.textContent = e.message || "Could not confirm suggestions";
+  }
+}
+
 function bindDocScanButtons(root) {
   if (!root) return;
   root.querySelectorAll("[data-bylaws-scan]").forEach((btn) => {
@@ -918,6 +1117,27 @@ function bindDocScanButtons(root) {
       }
     };
   });
+  root.querySelectorAll("[data-prior-scan]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!current || !current.id) return;
+      $("save-status").textContent = "Scanning on this device…";
+      try {
+        const data = await api("/api/prior-minutes/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            meeting_id: current.id,
+            filename: btn.getAttribute("data-prior-scan"),
+            label: btn.getAttribute("data-prior-label") || "prior_minutes",
+          }),
+        });
+        showPriorScan(data.prior_minutes_scan);
+        $("save-status").textContent = (data.prior_minutes_scan && data.prior_minutes_scan.message) || "Scan finished";
+      } catch (e) {
+        $("save-status").textContent = e.message || "Could not scan document";
+      }
+    };
+  });
 }
 
 function renderDocuments() {
@@ -929,9 +1149,12 @@ function renderDocuments() {
             ? `/api/meetings/${encodeURIComponent(current.id)}/documents/${encodeURIComponent(d.filename)}`
             : "#";
           const when = d.time ? ` · ${d.time}` : "";
-          const scan = isRulesLabel(d.label)
-            ? ` <button type="button" data-bylaws-scan="${d.filename}" data-bylaws-label="${d.label || "bylaws"}">Scan</button>`
-            : "";
+          let scan = "";
+          if (isRulesLabel(d.label)) {
+            scan = ` <button type="button" data-bylaws-scan="${d.filename}" data-bylaws-label="${d.label || "bylaws"}">Scan</button>`;
+          } else if (isPriorMinutesLabel(d.label)) {
+            scan = ` <button type="button" data-prior-scan="${d.filename}" data-prior-label="${d.label || "prior_minutes"}">Scan style</button>`;
+          }
           return `<li><a href="${href}" target="_blank" rel="noopener">${d.label || "other"} · ${d.filename} · ${formatDocBytes(d.bytes)}${when}</a>${scan}</li>`;
         })
         .join("")
@@ -1278,6 +1501,7 @@ async function addDocuments(fileList, label) {
   $("save-status").textContent = "Saving document…";
   try {
     let lastScan = null;
+    let lastPrior = null;
     for (const file of files) {
       const params = new URLSearchParams({
         label: label || "other",
@@ -1289,9 +1513,15 @@ async function addDocuments(fileList, label) {
       });
       current = data.meeting;
       if (data.bylaws_scan) lastScan = data.bylaws_scan;
+      if (data.prior_minutes_scan) lastPrior = data.prior_minutes_scan;
     }
     renderDocuments();
-    if (lastScan) {
+    if (lastPrior) {
+      showPriorScan(lastPrior);
+      $("save-status").textContent = lastPrior.found
+        ? "Suggestions ready — confirm before they fill the minutes style or Old Business."
+        : lastPrior.message || "Attached. No style cues found.";
+    } else if (lastScan) {
       showBylawsScan(lastScan);
       $("save-status").textContent = lastScan.found
         ? "Suggestions ready — confirm before they fill the quorum rule or officers."
@@ -1324,6 +1554,7 @@ function showWizard(force = false) {
   $("wiz-roster").value = rosterTextFromSettings();
   fillWizardQuorum(settings.quorum_rule);
   if ($("wiz-minutes-closing")) $("wiz-minutes-closing").value = settings.minutes_closing || "";
+  fillWizardMinutesStyle(settings);
   $("wizard").hidden = false;
   refreshWizardRosterDraft($("wiz-roster").value).catch(() => {
     wizRosterDraft = (settings.roster || []).map((name) => ({
@@ -1387,6 +1618,7 @@ $("btn-wiz-save").onclick = async () => {
         roster_titles: confirmedRosterTitles(wizRosterDraft),
         quorum_rule: readWizardQuorumRule(),
         minutes_closing: ($("wiz-minutes-closing") && $("wiz-minutes-closing").value.trim()) || "",
+        ...readWizardMinutesStyle(),
       }),
     }).then((d) => d.settings);
     $("wizard").hidden = true;
@@ -1696,6 +1928,17 @@ bindDocInput("doc-photo", "doc-label");
 bindDocInput("doc-file", "doc-label");
 bindDocInput("doc-camera-reports", "doc-label-reports");
 bindDocInput("doc-file-reports", "doc-label-reports");
+function bindPriorInput(inputId) {
+  const input = $(inputId);
+  if (!input) return;
+  input.onchange = (e) => {
+    addDocuments(e.target.files, "prior_minutes").finally(() => {
+      e.target.value = "";
+    });
+  };
+}
+bindPriorInput("doc-photo-prior");
+bindPriorInput("doc-file-prior");
 
 function collectBylawsConfirm() {
   const scan = bylawsScan || {};
@@ -1767,6 +2010,9 @@ async function confirmBylawsSelected() {
 if ($("btn-bylaws-confirm")) $("btn-bylaws-confirm").onclick = () => confirmBylawsSelected();
 if ($("btn-bylaws-skip")) $("btn-bylaws-skip").onclick = hideBylawsReview;
 if ($("btn-bylaws-open-rule")) $("btn-bylaws-open-rule").onclick = openQuorumRuleEditor;
+if ($("btn-prior-confirm")) $("btn-prior-confirm").onclick = () => confirmPriorSelected();
+if ($("btn-prior-skip")) $("btn-prior-skip").onclick = hidePriorReview;
+if ($("btn-prior-open-style")) $("btn-prior-open-style").onclick = openMinutesStyleEditor;
 if ($("btn-bylaws-open-officers")) {
   $("btn-bylaws-open-officers").onclick = () => {
     officerDraft = rememberedOfficersFromSettings();
