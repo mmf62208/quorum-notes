@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import ai, backup, config, demo, roster, settings as app_settings, signin, vault
+from . import ai, backup, bylaws, config, demo, roster, settings as app_settings, signin, vault
 from .agenda import agenda_status
 from .minutes import Meeting, Motion, Report, email_payload, render_minutes, render_minutes_html
 from .officers import apply_officer_titles, resolve_officers
@@ -256,7 +256,55 @@ class Handler(BaseHTTPRequestHandler):
                     "bytes": item.bytes,
                     "time": item.time,
                 }
+                if bylaws.is_rules_label(item.label):
+                    payload["bylaws_scan"] = bylaws.scan_bytes(
+                        data,
+                        filename=item.filename,
+                        label=item.label,
+                        settings=app_settings.load_settings(),
+                    ).to_dict()
                 return _json(self, 200, payload)
+            if path == "/api/bylaws/scan":
+                body = _read_json(self) or {}
+                prefs = app_settings.load_settings()
+                if body.get("meeting_id") and body.get("filename"):
+                    dest = vault.document_path(str(body.get("meeting_id")), str(body.get("filename")))
+                    if not dest.is_file():
+                        return _json(self, 404, {"error": "not found"})
+                    meeting = vault.load_meeting(str(body.get("meeting_id")))
+                    stored_label = "bylaws"
+                    for item in meeting.documents:
+                        if item.filename == dest.name:
+                            stored_label = item.label
+                            break
+                    scan = bylaws.scan_bytes(
+                        dest.read_bytes(),
+                        filename=dest.name,
+                        label=str(body.get("label") or stored_label),
+                        settings=prefs,
+                    )
+                    return _json(self, 200, {"bylaws_scan": scan.to_dict()})
+                if "text" in body:
+                    scan = bylaws.scan_text(
+                        str(body.get("text") or ""),
+                        filename=str(body.get("filename") or "pasted.txt"),
+                        label=str(body.get("label") or "bylaws"),
+                        settings=prefs,
+                    )
+                    return _json(self, 200, {"bylaws_scan": scan.to_dict()})
+                return _json(self, 400, {"error": "need text or meeting_id and filename"})
+            if path == "/api/bylaws/confirm":
+                body = _read_json(self) or {}
+                plan = bylaws.apply_confirmed(app_settings.load_settings(), body)
+                return _json(
+                    self,
+                    200,
+                    {
+                        "settings": plan.settings,
+                        "applied": plan.applied,
+                        "skipped": plan.skipped,
+                    },
+                )
             if path == "/api/backup":
                 dest = backup.make_backup()
                 return _json(self, 201, {"ok": True, "path": str(dest), "name": dest.name})

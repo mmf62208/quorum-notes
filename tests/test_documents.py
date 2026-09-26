@@ -35,6 +35,8 @@ class DocumentLabelTests(unittest.TestCase):
         self.assertEqual(normalize_doc_label("agenda"), "agenda")
         self.assertEqual(normalize_doc_label("HANDOUT"), "handout")
         self.assertEqual(normalize_doc_label("other"), "other")
+        self.assertEqual(normalize_doc_label("Bylaws"), "bylaws")
+        self.assertEqual(normalize_doc_label("standing-rules"), "standing_rules")
         self.assertEqual(normalize_doc_label("mystery"), "other")
         self.assertEqual(normalize_doc_label(""), "other")
 

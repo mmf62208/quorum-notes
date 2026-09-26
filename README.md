@@ -51,7 +51,7 @@ The sidebar shows phone URLs when the laptop is on Wi‑Fi (use `QUORUM_HOST=0.0
 2. **Hear the room** — pick the mic (headset / speakerphone / Bluetooth). The meter must move before Record.
 3. Tap names for **present**. **Mark late** then tap. While recording, tap a name to mark **who is talking**.
 4. Type a motion → **1st** → tap → **2nd** → tap → **Carried** / **Failed**. No second, no carry when Robert’s Rules is on.
-5. Take a **sign-in** photo, or attach a finance / agenda / handout file (camera or file picker). Files land in that meeting’s `docs/` folder.
+5. Take a **sign-in** photo, or attach a finance / agenda / handout / bylaws / standing-rules file (camera or file picker). Files land in that meeting’s `docs/` folder. Bylaws scans stay on this device and only fill the quorum rule or officers after you confirm.
 6. **Stop** → listen back (−15 / +15 / speed, or tap a speaker mark) → **Email**, **Download**, or **Print / PDF**.
 7. After a **sign-in photo**, tick the names you see and **Apply sign-in to present**. Unknown names are not added as members.
 8. **Undo** or `Ctrl+Z`. Keys: `1` first, `2` second, `V` carried.

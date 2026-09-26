@@ -64,6 +64,19 @@ button.big, .rec-btn, .stop-btn, .fat { min-height: 48px; min-width: 72px; font-
 #doc-list, #doc-list-reports { list-style: none; padding: 0; margin: 0.4rem 0 0.7rem; }
 #doc-list li, #doc-list-reports li { margin: 0.25rem 0; font-size: 0.9rem; }
 #doc-list a, #doc-list-reports a { color: var(--ink); }
+#bylaws-review {
+  border: 1px solid var(--line); background: #0f0d0b; padding: 0.65rem 0.75rem; margin: 0.6rem 0;
+}
+#bylaws-suggestions { list-style: none; padding: 0; margin: 0.35rem 0; }
+#bylaws-suggestions li {
+  display: flex; flex-direction: column; gap: 0.25rem;
+  border-top: 1px solid var(--line); padding: 0.45rem 0;
+}
+#bylaws-suggestions .kind {
+  color: var(--gold); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+}
+#bylaws-suggestions .change { color: var(--muted); font-size: 0.8rem; }
+#bylaws-suggestions .row.compact { margin: 0.15rem 0; }
 .file-btn { background: #2a241c; border: 1px solid var(--line); padding: 0.45rem 0.6rem; color: var(--ink); cursor: pointer; }
 .hint { color: var(--muted); font-size: 0.85rem; }
 .quorum-out { font-weight: 700; }
