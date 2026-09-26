@@ -360,6 +360,7 @@ def render_minutes(meeting: Meeting) -> str:
         lines.append(f"**Roll Call / Quorum:** {meeting.called_to_order_by} conducted roll call.")
     else:
         lines.append("**Roll Call / Quorum:** Roll was called.")
+    lines.append("")
     officers = _officer_entries(meeting)
     officer_keys = {normalize_name(name) for name, _title in officers}
     if officers:
